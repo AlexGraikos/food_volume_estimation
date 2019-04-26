@@ -1,0 +1,7 @@
+datasets/*
+sources/*
+*.pyc
+*.pdf
+*.png
+*.pfm
+!*.md
