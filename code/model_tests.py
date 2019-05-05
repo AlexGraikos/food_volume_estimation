@@ -14,9 +14,15 @@ class ModelTests:
         """
         self.args = self.parse_args()
         # Model parameters
-        custom_objects = {'ProjectionLayer': ProjectionLayer} # Should customize for each separate model
+        # Should customize for each separate model
+        custom_objects = {'ProjectionLayer': ProjectionLayer}
         self.test_model= load_model(self.args.model_file, custom_objects=custom_objects)
         self.img_shape = self.test_model.inputs[0].shape[1:]
+
+        # ?????
+        from PIL import ImageFile
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        # ?????
 
 
     def parse_args(self):
@@ -58,41 +64,52 @@ class ModelTests:
             # Print results
             plt.figure()
             plt.subplot(131)
-            plt.title('Input image')
-            plt.imshow(test_data[0][i])
+            plt.title('Previous frame')
+            plt.imshow(test_data[1][i])
 
             plt.subplot(132)
+            plt.title('Current frame')
+            plt.imshow(test_data[0][i])
+
+            plt.subplot(133)
+            plt.title('Next frame')
+            plt.imshow(test_data[2][i])
+
+            plt.figure()
+            plt.subplot(221)
             plt.title('Reprojection (scale 1 - prev)')
             plt.imshow(outputs[0][i])
 
-            plt.subplot(133)
+            plt.subplot(222)
             plt.title('Reprojection (scale 1 - next)')
             plt.imshow(outputs[1][i])
 
-            plt.figure()
-            plt.subplot(321)
+            '''
+            plt.subplot(223)
             plt.title('Reprojection (scale 2 - prev)')
             plt.imshow(outputs[2][i])
 
-            plt.subplot(322)
+            plt.subplot(224)
             plt.title('Reprojection (scale 2 - next)')
             plt.imshow(outputs[3][i])
 
-            plt.subplot(323)
+            plt.figure()
+            plt.subplot(221)
             plt.title('Reprojection (scale 3 - prev)')
             plt.imshow(outputs[4][i])
 
-            plt.subplot(324)
+            plt.subplot(222)
             plt.title('Reprojection (scale 3 - next)')
             plt.imshow(outputs[5][i])
 
-            plt.subplot(325)
+            plt.subplot(223)
             plt.title('Reprojection (scale 4 - prev)')
             plt.imshow(outputs[6][i])
 
-            plt.subplot(326)
+            plt.subplot(224)
             plt.title('Reprojection (scale 4 - next)')
             plt.imshow(outputs[7][i])
+            '''
             plt.show()
 
 
@@ -117,13 +134,27 @@ class ModelTests:
 
             # Print results
             plt.figure(i)
-            plt.subplot(121)
+            plt.subplot(321)
             plt.title('Input image')
             plt.imshow(test_data[0][i])
 
-            plt.subplot(122)
-            plt.title('Inferred depth')
-            plt.imshow(inverse_depth[i][:,:,0])
+            plt.subplot(323)
+            plt.title('Inferred depth (scale 1)')
+            plt.imshow(1/inverse_depth[i,:,:,0])
+            
+            '''
+            plt.subplot(324)
+            plt.title('Inferred depth (scale 2)')
+            plt.imshow(inverse_depth[1][i,:,:,0])
+            
+            plt.subplot(325)
+            plt.title('Inferred depth (scale 3)')
+            plt.imshow(inverse_depth[2][i,:,:,0])
+            
+            plt.subplot(326)
+            plt.title('Inferred depth (scale 4)')
+            plt.imshow(inverse_depth[3][i,:,:,0])
+            '''
             plt.show()
 
 
@@ -142,6 +173,7 @@ class ModelTests:
         datagen = pre.ImageDataGenerator(
                 rescale = 1./255,
                 channel_shift_range=0.1,
+                horizontal_flip=True,
                 fill_mode='nearest')
 
         # Frame generators

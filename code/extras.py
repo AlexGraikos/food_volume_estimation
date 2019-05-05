@@ -20,7 +20,10 @@ class ProjectionLayer(Layer):
     def call(self, x):
         source_img = x[0]
         depth_map = x[1]
-        pose_vector = x[2]
+        # Scale translation and rotation
+        translation = x[2][:,:3]*0.01
+        rotation = x[2][:,3:]*0.001
+        pose_vector = K.concatenate([translation, rotation], axis=-1)
         return projective_inverse_warp(source_img, depth_map, pose_vector, self.intrinsicsTensor)
 
     def compute_output_shape(self, input_shape):
@@ -35,11 +38,12 @@ def inverseDepthNormalization(disparityMap):
         Outputs:
             depthMap: The corresponding depth map
     """
-    epsilon = 1.0e-6
-    normalizedMap = disparityMap / (K.mean(disparityMap, axis=[1,2]) + epsilon)
-    depthMap = 1 / (disparityMap + epsilon)
+    epsilon = 10e-5
+    mean = K.mean(disparityMap, axis=[1,2,3], keepdims=True)
+    normalizedDisp = disparityMap / mean
+    depthMap = 1 / (normalizedDisp + epsilon)
     return depthMap
-    
+
 
 def generateAdversarialInput(input_images, omega):
     """
@@ -72,8 +76,8 @@ def perReprojectionMinimumMAE(input_images):
     reprojection2 = input_images[2]
 
     # Compute MAE, add channels axis to concatenate and apply min
-    mae1 = K.expand_dims(K.mean(K.abs(target_image-reprojection1), axis=-1), axis=-1)
-    mae2 = K.expand_dims(K.mean(K.abs(target_image-reprojection2), axis=-1), axis=-1)
-    return K.expand_dims(K.min(K.concatenate([mae1, mae2], axis=-1), axis=-1), axis=-1)
+    mae1 = K.mean(K.abs(target_image-reprojection1), axis=-1, keepdims=True)
+    mae2 = K.mean(K.abs(target_image-reprojection2), axis=-1, keepdims=True)
+    return K.min(K.concatenate([mae1, mae2], axis=-1), axis=-1, keepdims=True)
     
     

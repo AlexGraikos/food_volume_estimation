@@ -78,6 +78,7 @@ class DataUtils():
         # Concat all and save
         set_df = pd.concat(sequences, axis=0, ignore_index=True)
         set_df.to_hdf(df_file, key='df', format='fixed', mode='w')
+        print('[*] Total frames:', set_df.shape[0])
         print('[*] Finished creating set dataFrame and saved in', '"'+os.path.abspath(df_file)+'"')
         
 
