@@ -45,7 +45,7 @@ def inverseDepthNormalization(disparityMap):
     epsilon = 10e-6
     mean = K.mean(disparityMap, axis=[1,2,3], keepdims=True)
     normalizedDisp = disparityMap / mean
-    depthMap = 1 / (disparityMap + epsilon)
+    depthMap = 1 / (normalizedDisp + epsilon)
     return depthMap
 
 

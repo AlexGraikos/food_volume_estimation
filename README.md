@@ -2,17 +2,15 @@
 This project aims to establish a method for estimating the volume of foods in a input image using deep learning monocular depth estimation techniques.
 
 ## Todo
-- Check why model outputs are zero. Model needs a lot of modifications
-- Check encoder->decoder skip connections
-- Validate that python3 port is working properly (check divisions -> they are now altered)
+- Implement discriminator (single or multi scale)
+- Add more decoder output scales
+- (Possibly) Use per-scale min error (MAE)
+- Verify that everything is working OK up until now
 - Clean up code!
-- Add possibly other preprocessing parameters to dataframe and set creation utils in - data_utils.py
-- Run loads of tests
+- Add possibly other preprocessing parameters to dataframe and set creation utils in - data_utils.py (e.g. filter frames using optical flow)
 
 ## Done
-- Implemented depth-predicting model
-- Model can be trained, no actual tests ran
-- ResNet18 instead of DenseNet used to reduce computational and memory costs
-- Code in model and data_utils made prettier using cmd arguments
-- Ported everything to python3
+- Model now uses the encoder-decoder from adversarial monocular depth estimation
+- Training with L1 and single scale yields better results than ever achieved before
+- Now applying correct (90%) inverse depth normalization
 
