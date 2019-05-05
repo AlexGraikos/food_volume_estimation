@@ -9,8 +9,12 @@ class ProjectionLayer(Layer):
         during training
     """
 
-    def __init__(self, intrinsicsMatrix=np.eye(3), **kwargs):
-        self.intrinsicsMatrix = intrinsicsMatrix
+    def __init__(self, intrinsicsMatrix=None, **kwargs):
+        if intrinsicsMatrix is None:
+            intrinsicsMatrix = np.array([[1, 0, 0.5],
+                [0, 1, 0.5], [0, 0, 1]])
+        else:
+            self.intrinsicsMatrix = intrinsicsMatrix
         super(ProjectionLayer, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -38,10 +42,10 @@ def inverseDepthNormalization(disparityMap):
         Outputs:
             depthMap: The corresponding depth map
     """
-    epsilon = 10e-5
+    epsilon = 10e-6
     mean = K.mean(disparityMap, axis=[1,2,3], keepdims=True)
     normalizedDisp = disparityMap / mean
-    depthMap = 1 / (normalizedDisp + epsilon)
+    depthMap = 1 / (disparityMap + epsilon)
     return depthMap
 
 

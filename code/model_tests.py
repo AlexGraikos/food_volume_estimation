@@ -140,7 +140,7 @@ class ModelTests:
 
             plt.subplot(323)
             plt.title('Inferred depth (scale 1)')
-            plt.imshow(1/inverse_depth[i,:,:,0])
+            plt.imshow(inverse_depth[i,:,:,0])
             
             '''
             plt.subplot(324)
