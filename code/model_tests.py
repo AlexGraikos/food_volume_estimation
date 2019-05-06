@@ -84,7 +84,6 @@ class ModelTests:
             plt.title('Reprojection (scale 1 - next)')
             plt.imshow(outputs[1][i])
 
-            '''
             plt.subplot(223)
             plt.title('Reprojection (scale 2 - prev)')
             plt.imshow(outputs[2][i])
@@ -109,7 +108,6 @@ class ModelTests:
             plt.subplot(224)
             plt.title('Reprojection (scale 4 - next)')
             plt.imshow(outputs[7][i])
-            '''
             plt.show()
 
 
@@ -140,9 +138,8 @@ class ModelTests:
 
             plt.subplot(323)
             plt.title('Inferred depth (scale 1)')
-            plt.imshow(inverse_depth[i,:,:,0])
+            plt.imshow(inverse_depth[0][i,:,:,0])
             
-            '''
             plt.subplot(324)
             plt.title('Inferred depth (scale 2)')
             plt.imshow(inverse_depth[1][i,:,:,0])
@@ -154,7 +151,6 @@ class ModelTests:
             plt.subplot(326)
             plt.title('Inferred depth (scale 4)')
             plt.imshow(inverse_depth[3][i,:,:,0])
-            '''
             plt.show()
 
 

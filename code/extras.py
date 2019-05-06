@@ -11,7 +11,7 @@ class ProjectionLayer(Layer):
 
     def __init__(self, intrinsicsMatrix=None, **kwargs):
         if intrinsicsMatrix is None:
-            intrinsicsMatrix = np.array([[1, 0, 0.5],
+            self.intrinsicsMatrix = np.array([[1, 0, 0.5],
                 [0, 1, 0.5], [0, 0, 1]])
         else:
             self.intrinsicsMatrix = intrinsicsMatrix
@@ -43,9 +43,11 @@ def inverseDepthNormalization(disparityMap):
             depthMap: The corresponding depth map
     """
     epsilon = 10e-6
+    disparityMap = disparityMap + epsilon # To avoid division by zero
+
     mean = K.mean(disparityMap, axis=[1,2,3], keepdims=True)
     normalizedDisp = disparityMap / mean
-    depthMap = 1 / (normalizedDisp + epsilon)
+    depthMap = 1 / normalizedDisp
     return depthMap
 
 
@@ -66,7 +68,7 @@ def generateAdversarialInput(input_images, omega):
     return adversarial_input
 
 
-def perReprojectionMinimumMAE(input_images):
+def perScaleMinimumMAE(input_images):
     """
     Computes the minimum mean absolute error between the target image and 
     the source to target reprojections
