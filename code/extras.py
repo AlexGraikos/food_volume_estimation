@@ -43,7 +43,7 @@ def inverseDepthNormalization(disparityMap):
             depthMap: The corresponding depth map
     """
     epsilon = 10e-6
-    disparityMap = disparityMap + epsilon # To avoid division by zero
+    disparityMap = 10*disparityMap + epsilon # To avoid division by zero
 
     mean = K.mean(disparityMap, axis=[1,2,3], keepdims=True)
     normalizedDisp = disparityMap / mean
@@ -68,22 +68,60 @@ def generateAdversarialInput(input_images, omega):
     return adversarial_input
 
 
-def perScaleMinimumMAE(input_images):
+def perScaleMinMAE(y_true, y_pred):
     """
     Computes the minimum mean absolute error between the target image and 
     the source to target reprojections
         Inputs:
-            input_images: [target_img, reprojection1, reprojection2] tensors
+            y_true: Target image
+            y_pred: Source to target reprojections concatenated along the channel axis
         Outputs:
             min_error: Minimum MAE between the two reprojections
     """
-    target_image = input_images[0]
-    reprojection1 = input_images[1]
-    reprojection2 = input_images[2]
+    # Split channels to prev and next reprojection
+    reprojection_prev = y_pred[:,:,:,:3]
+    reprojection_next = y_pred[:,:,:,3:]
 
-    # Compute MAE, add channels axis to concatenate and apply min
-    mae1 = K.mean(K.abs(target_image-reprojection1), axis=-1, keepdims=True)
-    mae2 = K.mean(K.abs(target_image-reprojection2), axis=-1, keepdims=True)
-    return K.min(K.concatenate([mae1, mae2], axis=-1), axis=-1, keepdims=True)
-    
-    
+    mae_prev = K.sum(K.abs(y_true-reprojection_prev), axis=-1, keepdims=True)
+    mae_next = K.sum(K.abs(y_true-reprojection_next), axis=-1, keepdims=True)
+    minMAE = K.minimum(mae_prev, mae_next)
+    return K.mean(minMAE, axis=[1,2,3])
+
+
+"""
+Taken from
+https://github.com/tensorflow/models/tree/master/research/struct2depth
+Modified
+"""
+def gradient_x(img):
+    return img[:, :, :-1, :] - img[:, :, 1:, :]
+
+
+def gradient_y(img):
+    return img[:, :-1, :, :] - img[:, 1:, :, :]
+
+
+def depth_smoothness(y_true, y_pred):
+    """
+    Computes image-aware depth smoothness loss
+        Inputs:
+            y_true: Target image
+            y_pred: Predicted depth map
+        Outputs:
+            smoothness_loss: Depth smoothness loss
+    """
+    depth = y_pred
+    img= y_true
+    img_resized = tf.image.resize_nearest_neighbor(img, depth.shape[1:3])
+
+    depth_dx = gradient_x(depth)
+    depth_dy = gradient_y(depth)
+    image_dx = gradient_x(img_resized)
+    image_dy = gradient_y(img_resized)
+    weights_x = tf.exp(-tf.reduce_mean(tf.abs(image_dx), 3, keepdims=True))
+    weights_y = tf.exp(-tf.reduce_mean(tf.abs(image_dy), 3, keepdims=True))
+    smoothness_x = depth_dx * weights_x
+    smoothness_y = depth_dy * weights_y
+    smoothness_loss = tf.reduce_mean(abs(smoothness_x)) + tf.reduce_mean(abs(smoothness_y))
+    return smoothness_loss
+

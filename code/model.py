@@ -22,11 +22,6 @@ class MonocularAdversarialModel:
         self.model_name = self.args.model_name
         self.omega = self.args.omega
 
-        # ?????
-        from PIL import ImageFile
-        ImageFile.LOAD_TRUNCATED_IMAGES = True
-        # ?????
-
 
     def parse_args(self):
         """
@@ -44,6 +39,7 @@ class MonocularAdversarialModel:
         parser.add_argument('--model_name', type=str, help='Name to use for saving model.', default='monovideo')
         parser.add_argument('--img_width', type=int, help='Input image width.', default=224)
         parser.add_argument('--img_height', type=int, help='Input image height.', default=128)
+        parser.add_argument('--save_per', type=int, help='Epochs between saving model during training.', default=5)
         args = parser.parse_args()
         return args
 
@@ -90,21 +86,18 @@ class MonocularAdversarialModel:
         # Train discriminator and generator successively
         for i in range(training_epochs):
             print('[-] Adversarial model training epoch [',i+1,'/',training_epochs,']',sep='')
-
-            # Train discriminator
             print('[-] Discriminator Valid')
-            self.discriminator.fit_generator(discriminatorValidDatagen, steps_per_epoch=steps_per_epoch,
-                epochs=i+1, initial_epoch=i, verbose=1)
+            #self.discriminator.fit_generator(discriminatorValidDatagen, steps_per_epoch=steps_per_epoch,
+            #    epochs=i+1, initial_epoch=i, verbose=1)
             print('[-] Discriminator Invalid')
-            self.discriminator.fit_generator(discriminatorInvalidDatagen, steps_per_epoch=steps_per_epoch,
-                epochs=i+1, initial_epoch=i, verbose=1)
-            # Train generator
+            #self.discriminator.fit_generator(discriminatorInvalidDatagen, steps_per_epoch=steps_per_epoch,
+            #    epochs=i+1, initial_epoch=i, verbose=1)
             print('[-] Adversarial model')
             self.adversarial_model.fit_generator(adversarialDatagen, steps_per_epoch=steps_per_epoch,
                 epochs=i+1, initial_epoch=i, verbose=1)
 
-            # Save model every 5 epochs
-            if (i % 5 == 0):
+            # Save model every x epochs
+            if (i % self.args.save_per == 0):
                 postfix = '_epoch_' + str(i+1)
                 print('[*] Saving model at epoch',i+1)
                 self.save_model(postfix)
@@ -133,20 +126,35 @@ class MonocularAdversarialModel:
         self.create_discriminator(self.omega)
         print('[*] Created discriminator model')
         # Synthesize adversarial model
-        validationPrev1 = self.discriminator([self.generator.input[0], self.generator.output[0]])
-        validationNext1 = self.discriminator([self.generator.input[0], self.generator.output[1]])
+        prevReprojections = [self.generator.output[0], self.generator.output[2],
+                             self.generator.output[4], self.generator.output[6]]
+        nextReprojections = [self.generator.output[1], self.generator.output[3],
+                             self.generator.output[5], self.generator.output[7]]
+        inverseDepths = [self.generator.output[8], self.generator.output[9],
+                             self.generator.output[10], self.generator.output[11]]
+        # Concatenate reprojections per-scale for computing loss
+        perScaleReprojections = \
+            [Concatenate(name='scale1_reprojections')([prevReprojections[0], nextReprojections[0]]),
+             Concatenate(name='scale2_reprojections')([prevReprojections[1], nextReprojections[1]]),
+             Concatenate(name='scale3_reprojections')([prevReprojections[2], nextReprojections[2]]),
+             Concatenate(name='scale4_reprojections')([prevReprojections[3], nextReprojections[3]])]
+        # Adversarial error
+        validationPrev = self.discriminator([self.generator.input[0]] + prevReprojections)
+        validationNext = self.discriminator([self.generator.input[0]] + nextReprojections)
+        # Adversarial model
         self.adversarial_model = Model(inputs=self.generator.input,
-            outputs=(self.generator.output[8:] + [validationPrev1, validationNext1]))
+            outputs=(perScaleReprojections))
+            # + [validationPrev, validationNext]))
 
         # Compile models
         adam_opt = Adam(lr=10e-4)
         self.discriminator.compile(adam_opt, loss='binary_crossentropy')
 
         self.discriminator.trainable = False
-        loss_list = (['mae' for _ in range(4)] +
-                     ['binary_crossentropy' for _ in range(2)])
-        loss_weights = ([0.995/4 for _ in range(4)]+
-                        [0.005/2 for _ in range(2)])
+        loss_list = ([perScaleMinMAE for _ in range(4)])
+                     #[None for _ in range(2)])
+        loss_weights = ([1 for _ in range(4)])
+                        #[0.005/2 for _ in range(2)])
         self.adversarial_model.compile(adam_opt, loss=loss_list, loss_weights=loss_weights)
         print('[*] Created adversarial model')
 
@@ -174,14 +182,8 @@ class MonocularAdversarialModel:
         poses = pose_net([depth_encoder_curr[0], depth_features_prev, depth_features_next])
         # Reprojections
         reprojections = reprojection_module([prev_frame, next_frame, poses] + inverseDepths)
-        scale1MinMAE = Lambda(perScaleMinimumMAE)([curr_frame, reprojections[0], reprojections[1]])
-        scale2MinMAE = Lambda(perScaleMinimumMAE)([curr_frame, reprojections[2], reprojections[3]])
-        scale3MinMAE = Lambda(perScaleMinimumMAE)([curr_frame, reprojections[4], reprojections[5]])
-        scale4MinMAE = Lambda(perScaleMinimumMAE)([curr_frame, reprojections[6], reprojections[7]])
-
         # Models
-        self.generator = Model(inputs=[curr_frame, prev_frame, next_frame],
-            outputs=(reprojections + [scale1MinMAE, scale2MinMAE, scale3MinMAE, scale4MinMAE]))
+        self.generator = Model(inputs=[curr_frame, prev_frame, next_frame], outputs=(reprojections + inverseDepths))
         self.depth_inference_model = Model(inputs=[curr_frame, prev_frame, next_frame], outputs=inverseDepths)
 
 
@@ -196,6 +198,7 @@ class MonocularAdversarialModel:
         def enc_layer(prev_layer, filters, stride, kernel=3):
             enc = Conv2D(filters=filters, kernel_size=kernel, strides=stride, padding='same', activation='relu')(prev_layer) 
             return enc
+
         # Input
         input_frame = Input(shape=self.img_shape)
         # Layers 
@@ -229,15 +232,23 @@ class MonocularAdversarialModel:
             Outputs:
                 depth_decoder: Depth decoder model
         """
-        # Layer-generating function
+        # Layer-generating functions
         def dec_layer(prev_layer, skip_layer, filters, upsample):
             dec = prev_layer
             if (upsample):
                 dec = UpSampling2D(size=(2,2))(dec)
             if (skip_layer != None):
                 dec = Concatenate()([skip_layer, dec])
-            dec = Conv2D(filters=filters, kernel_size=3, strides=1, padding='same', activation='relu')(dec)
+            dec = Conv2D(filters=filters, kernel_size=3, strides=1, padding='same', activation='sigmoid')(dec)
             return dec
+
+        def generate_disparity(prev_layer, prev_disp=None):
+            if prev_disp is not None:
+                prev_disp_up = UpSampling2D(size=(2,2), interpolation='nearest')(prev_disp)
+                prev_layer = Concatenate()([prev_layer, prev_disp_up])
+            disp = Conv2D(filters=1, kernel_size=3, padding='same', activation='relu')(prev_layer)
+            return disp
+
         # Inputs
         depth_features = Input(shape=depth_encoder_output_shapes[0][1:])
         skip6 = Input(shape=depth_encoder_output_shapes[1][1:])
@@ -262,10 +273,10 @@ class MonocularAdversarialModel:
         dec1  = dec_layer(dec2b, None, 16,  upsample=True)
         dec1b = dec_layer(dec1,  None, 16,  upsample=False)
         # Inverse depth outputs
-        inverseDepth4 = Conv2D(filters=1, kernel_size=3, padding='same', activation='relu')(dec4b)
-        inverseDepth3 = Conv2D(filters=1, kernel_size=3, padding='same', activation='relu')(dec3b)
-        inverseDepth2 = Conv2D(filters=1, kernel_size=3, padding='same', activation='relu')(dec2b)
-        inverseDepth1 = Conv2D(filters=1, kernel_size=3, padding='same', activation='relu')(dec1b)
+        inverseDepth4 = generate_disparity(dec4b)
+        inverseDepth3 = generate_disparity(dec3b, inverseDepth4)
+        inverseDepth2 = generate_disparity(dec2b, inverseDepth3)
+        inverseDepth1 = generate_disparity(dec1b, inverseDepth2)
         # Model
         depth_decoder = Model(inputs=[depth_features, skip6, skip5, skip4, skip3, skip2, skip1],
             outputs=[inverseDepth1, inverseDepth2, inverseDepth3, inverseDepth4])
@@ -316,6 +327,8 @@ class MonocularAdversarialModel:
         poseNext = Lambda(lambda x: x[:,6:])(poses)
         intrinsicsMatrix = np.array([[1000/2.36, 0, 950/2.36],
             [0, 1000/2.36, 540/2.36], [0, 0, 1]])
+        #intrinsicsMatrix = np.array([[1, 0, 0.5],
+        #    [0, 1, 0.5], [0, 0, 1]])
 
         # Upsample and normalize inverse depth maps
         inverseDepth2Up = UpSampling2D(size=(2,2), interpolation='nearest')(inverseDepth2)
@@ -343,31 +356,45 @@ class MonocularAdversarialModel:
         """
         Creates the discriminator model and saves it in self.discriminator
         """
-        # Layer generating function
-        def discr_layer(prev_layer, filters, stride, kernel=4, batch_norm=True):
-            discr = Conv2D(filters=filters, kernel_size=kernel, strides=stride, padding='same')(prev_layer) 
+        # Layer-generating function
+        def discr_layer(prev_layer, filters, kernel=3, skip=None, batch_norm=True):
+            if skip is not None:
+                prev_layer = Concatenate()([prev_layer, skip])
+            discr = Conv2D(filters=filters, kernel_size=kernel, strides=2, padding='same')(prev_layer) 
             if batch_norm:
                 discr = BatchNormalization()(discr)
             discr = LeakyReLU(alpha=0.2)(discr)
             return discr
+            
         #Inputs
         target_img = Input(shape=self.img_shape)
-        reprojected_img = Input(shape=self.img_shape)
-        adversarial_input = Lambda(generateAdversarialInput,
-            arguments={'omega': omega})([target_img, reprojected_img])
+        reprojected_img1 = Input(shape=self.img_shape)
+        reprojected_img2 = Input(shape=self.img_shape)
+        reprojected_img3 = Input(shape=self.img_shape)
+        reprojected_img4 = Input(shape=self.img_shape)
+        # Downsample input images
+        skip2 = Conv2D(filters=1, kernel_size=1, strides=2, padding='same')(reprojected_img2)
+        skip2 = LeakyReLU(alpha=0.2)(skip2)
+        skip3 = Conv2D(filters=1, kernel_size=1, strides=4, padding='same')(reprojected_img3)
+        skip3 = LeakyReLU(alpha=0.2)(skip3)
+        skip4 = Conv2D(filters=1, kernel_size=1, strides=8, padding='same')(reprojected_img4)
+        skip4 = LeakyReLU(alpha=0.2)(skip4)
+        #adversarial_input = Lambda(generateAdversarialInput,
+        #    arguments={'omega': omega})([target_img, reprojected_img])
         # Discriminator network
-        discr1  = discr_layer(reprojected_img, 32, 2, 5, False)
-        discr2  = discr_layer(discr1,  64, 2)
-        discr3  = discr_layer(discr2, 128, 2)
-        discr4  = discr_layer(discr3, 256, 2)
-        discr5  = discr_layer(discr4, 512, 2)
-        discr6  = discr_layer(discr5, 512, 2)
+        discr1  = discr_layer(reprojected_img1, 32, kernel=5, batch_norm=False)
+        discr2  = discr_layer(discr1,  64, skip=skip2)
+        discr3  = discr_layer(discr2, 128, skip=skip3)
+        discr4  = discr_layer(discr3, 256, skip=skip4)
+        discr5  = discr_layer(discr4, 512)
+        discr6  = discr_layer(discr5, 512)
 
         discr6_flat = Flatten()(discr6)
         validation = Dense(units=1, activation='sigmoid')(discr6_flat)
 
         # Create discriminator
-        self.discriminator = Model(inputs=[target_img, reprojected_img], outputs=validation)
+        self.discriminator = Model(inputs=[target_img, reprojected_img1, reprojected_img2,
+            reprojected_img3, reprojected_img4], outputs=validation)
         #self.discriminator.summary()
 
 
@@ -412,16 +439,17 @@ class MonocularAdversarialModel:
             half_batch = curr_frame.shape[0]//2
             generator_split1 = np.concatenate((generator_samples[0][:half_batch],
                 generator_samples[1][half_batch:]), axis=0)
-            #generator_split2 = np.concatenate((generator_samples[2][:half_batch],
-            #    generator_samples[3][half_batch:]), axis=0)
-            #generator_split3 = np.concatenate((generator_samples[4][:half_batch],
-            #    generator_samples[5][half_batch:]), axis=0)
-            #generator_split4 = np.concatenate((generator_samples[6][:half_batch],
-            #    generator_samples[7][half_batch:]), axis=0)
+            generator_split2 = np.concatenate((generator_samples[2][:half_batch],
+                generator_samples[3][half_batch:]), axis=0)
+            generator_split3 = np.concatenate((generator_samples[4][:half_batch],
+                generator_samples[5][half_batch:]), axis=0)
+            generator_split4 = np.concatenate((generator_samples[6][:half_batch],
+                generator_samples[7][half_batch:]), axis=0)
             validation_labels = np.zeros((generator_samples[0].shape[0],1))
 
             # Returns (inputs, outputs) tuple
-            yield ([curr_frame, generator_split1], validation_labels)
+            yield ([curr_frame, generator_split1, generator_split2, generator_split3,
+                generator_split4], validation_labels)
 
 
     def discriminator_valid_datagen(self, training_data_df, height, width, batch_size):
@@ -450,10 +478,11 @@ class MonocularAdversarialModel:
     
         while True:
             curr_frame = curr_generator.__next__()
+            curr_frame_list = [curr_frame for _ in range(5)]
             validation_labels = np.ones((curr_frame.shape[0],1))
 
             # Returns (inputs, outputs) tuple
-            yield ([curr_frame, curr_frame], validation_labels)
+            yield (curr_frame_list, validation_labels)
 
 
     def adversarial_datagen(self, training_data_df, height, width, batch_size):
@@ -493,11 +522,10 @@ class MonocularAdversarialModel:
 
             # Returns (inputs,outputs) tuple
             batch_size_curr = curr_frame.shape[0]
-            zeros_maps = np.zeros((4, batch_size_curr, height, width, 1)) # Zero min per-scale error
-            #reconstructions = np.repeat([curr_frame], 8, axis=0)
-            true_labels = np.ones((2, batch_size_curr, 1))
+            curr_frame_list = [curr_frame for _ in range(4)]
+            true_labels = [np.ones((batch_size_curr, 1)) for _ in range(2)]
 
-            yield ([curr_frame, prev_frame, next_frame], (zeros_maps.tolist() + true_labels.tolist()))
+            yield ([curr_frame, prev_frame, next_frame], curr_frame_list)
 
 
 

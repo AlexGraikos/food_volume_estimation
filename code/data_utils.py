@@ -19,8 +19,9 @@ class DataUtils():
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='Data processing utilities.')
         parser.add_argument('--createSet', action='store_true', help='Create image set from sources.', default=False)
-        parser.add_argument('--createSetDF', action='store_true', help='Create image set dataFrame from sources.', default=False)
-        parser.add_argument('--data_source_file', type=str, help='File containing the data sources.', default=None)
+        parser.add_argument('--createSetDf', action='store_true', help='Create frame dataFrame from sources.', default=False)
+        parser.add_argument('--createDirDf', action='store_true', help='Create frame dataFrame from directory.', default=False)
+        parser.add_argument('--data_source', type=str, help='File containing the data sources.', default=None)
         parser.add_argument('--save_target', type=str, help='Target directory/file to save created set/dataFrame.', default=None)
         parser.add_argument('--target_width', type=int, help='Target image width.', default=224)
         parser.add_argument('--target_height', type=int, help='Target image height.', default=128)
@@ -53,6 +54,23 @@ class DataUtils():
         return sequence_df
 
 
+    def createDirectoryDataFrame(self, directory, df_file):
+        """
+        Creates a sequence dataFrame that describes a directory of frames
+        The dataFrame is saved in df_file (HDF5 format, key=df)
+        The created dataFrame has columns [curr_frame, prev_frame, next_frame]
+            Inputs:
+                directory: Directory containing frames composing the target set
+                df_file: The target file to save the dataFrame (.h5)
+        """
+
+        # Concat all and save
+        directory_df = self.createSequenceDataFrame(directory)
+        directory_df.to_hdf(df_file, key='df', format='fixed', mode='w')
+        print('[*] Total frames:', directory_df.shape[0])
+        print('[*] Finished creating set dataFrame and saved in', '"'+os.path.abspath(df_file)+'"')
+ 
+
     def createSetDataFrame(self, data_source_file, df_file, stride=1):
         """
         Creates a sequence dataFrame that describes a set of images defind in data_source_file
@@ -82,15 +100,17 @@ class DataUtils():
         print('[*] Finished creating set dataFrame and saved in', '"'+os.path.abspath(df_file)+'"')
         
 
-    def createSet(self, data_source_file, target_dir, target_size=None, interpolation='nearest'):
+    def createSet(self, data_source_file, target_dir, target_size=None, interpolation='nearest', stride=2):
         """
         Creates a set of images from source directories defined in data_source_file 
+        Set is filtered with the proposed preprocessing method
         The set is saved at target_dir with target_size image sizes
             Inputs:
                 data_source_file: File defining image directories that compose the target set
                 target_dir: The target directory to save the set
                 target_size: Target image size
                 interpolation: Interpolation method [nearest (default)/bilinear/cubic]
+                stride: Frame loading stride
         """
         # Load data source directories
         data_sources = [line.rstrip('\n') for line in open(data_source_file, 'r')]
@@ -125,44 +145,72 @@ class DataUtils():
             cv2_interp = cv2.INTER_NEAREST
 
         # For each data source directory load images, resize, and save in target directory
-        source_files = 0
-        target_images = 0
-        for source in data_sources:
-            print('[*] Loading data from', source)
-            image_files = [f for f in os.listdir(source)
-                if os.path.isfile(os.path.join(source,f))]
-            source_files += len(os.listdir(source))
+        total_frames = 0
+        target_frames = 0
+        rejected_frames = 0
+        failed_frames = 0
+        for source_rgb in data_sources:
+            dirs_list = os.path.abspath(source_rgb).split('/')
+            dirs_list[dirs_list.index('rgb')] = 'flow' # pls dont have another "rgb" directory
+            source_flow = '/'.join(dirs_list)
+            print('[*] Loading data from', source_rgb)
+            image_files = [f for f in os.listdir(source_rgb)
+                if os.path.isfile(os.path.join(source_rgb,f))]
+            total_frames += len(image_files)
 
-            for i in image_files:
-                source_file_path = os.path.join(source,i)
+            flow_counter = 0
+            for rgb_counter in range(1, len(image_files)+1, stride):
+                flow_counter += 1
+                frame_name_rgb = 'frame_{:010d}.jpg'.format(rgb_counter)
+                frame_name_flow = 'frame_{:010d}.jpg'.format(flow_counter)
+                # Load image and optical flow
+                rgb_file_path = os.path.join(source_rgb, frame_name_rgb)
+                flow_u_file_path = os.path.join(source_flow + '/u/', frame_name_flow)
+                flow_v_file_path = os.path.join(source_flow + '/v/', frame_name_flow)
+
+                img = cv2.imread(rgb_file_path, cv2.IMREAD_COLOR) 
+                flow_u = cv2.imread(flow_u_file_path, cv2.IMREAD_UNCHANGED)
+                flow_v = cv2.imread(flow_u_file_path, cv2.IMREAD_UNCHANGED)
+                # If any image loading failed continue
+                if flow_u is None or flow_v is None or img is None:
+                    failed_frames += 1
+                    continue
+                # Compute optical flow mean and ignore if < 1 pixel
+                flow_u_scaled = flow_u*(50/255) - 25
+                flow_v_scaled = flow_v*(50/255) - 25
+                flow_mean = np.mean(np.sqrt(np.square(flow_u_scaled) + np.square(flow_v_scaled)))
+                if flow_mean < 1:
+                    rejected_frames += 1
+                    continue
+
                 # Compose target file name
-                prefix = os.path.basename(os.path.dirname(source_file_path)) + '_'
-                target_file_path = os.path.join(target_dir, prefix + i)
-
-                img = cv2.imread(source_file_path, cv2.IMREAD_COLOR) 
+                prefix = os.path.basename(os.path.dirname(rgb_file_path)) + '_'
+                target_file_path = os.path.join(target_dir, prefix + frame_name_rgb)
                 if target_size is None:
                     target_size = img.shape[:2]
                 img_resized = cv2.resize(img, target_size[::-1], interpolation=cv2_interp)
                 cv2.imwrite(target_file_path, img_resized)
-                target_images += 1
+                target_frames += 1
 
         # Check number of source and target files
-        if source_files != target_images:
-            print('[!] Mismatch between number of source and target images')
         print('[*] Finished creating set')
-            
+        print('[*] Total frames: %d, Target frames: %d, Rejected frames: %d, Failed frames: %d' % \
+            (total_frames, target_frames, rejected_frames, failed_frames))
+
 
 
 if __name__ == '__main__':
     imgUtils = DataUtils()
 
     if imgUtils.args.createSet == True:
-        imgUtils.createSet(imgUtils.args.data_source_file, imgUtils.args.save_target,
+        imgUtils.createSet(imgUtils.args.data_source, imgUtils.args.save_target,
             target_size=(imgUtils.args.target_height, imgUtils.args.target_width),
-            interpolation=imgUtils.args.interp)
-    elif imgUtils.args.createSetDF == True:
-        imgUtils.createSetDataFrame(imgUtils.args.data_source_file, imgUtils.args.save_target,
+            interpolation=imgUtils.args.interp, stride=imgUtils.args.stride)
+    elif imgUtils.args.createSetDf == True:
+        imgUtils.createSetDataFrame(imgUtils.args.data_source, imgUtils.args.save_target,
         stride=imgUtils.args.stride)
+    elif imgUtils.args.createDirDf == True:
+        imgUtils.createDirectoryDataFrame(imgUtils.args.data_source, imgUtils.args.save_target)
     else:
         print('[!] Unknown operation argument, use -h flag for help.')
 
