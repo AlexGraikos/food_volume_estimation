@@ -8,13 +8,13 @@ from keras.layers import Conv2D, UpSampling2D, GlobalAveragePooling2D, \
 from keras.optimizers import Adam
 from keras import callbacks
 import keras.preprocessing.image as pre
-from extras import *
+import extras
 
 class MonocularAdversarialModel:
 
     def __init__(self):
         """"
-        Initializes general parameters and creates models
+        Read command-line arguments and initialize general model parameters
         """
         self.args = self.parse_args()
         # Model parameters
@@ -25,7 +25,7 @@ class MonocularAdversarialModel:
 
     def parse_args(self):
         """
-        Parses command-line input arguments
+        Parse command-line input arguments
             Outputs:
                 args: The arguments object
         """
@@ -44,6 +44,29 @@ class MonocularAdversarialModel:
         return args
 
 
+    # Learning rate halving callback function
+    def __learning_rate_halving(self, start_epoch, period):
+        """
+        Create callback function to halve learning rate during training
+            Inputs:
+                start_epoch: First epoch to halve learning rate at
+                period: Learning rate halving epoch period
+            Outputs:
+                halve_lr: Learning rate halving callback function
+        """
+        def halve_lr(epoch, curr_lr):
+            # Epochs are zero-indexed
+            if (epoch < start_epoch-1):
+                return curr_lr
+            else:
+                if ((epoch-(start_epoch-1)) % period == 0):
+                    print('[*] Halving learning rate (=',curr_lr,' -> ',(curr_lr / 2.0),')',sep='')
+                    return curr_lr / 2.0
+                else:
+                    return curr_lr
+        return halve_lr
+
+
     def train(self, train_df_file, batch_size, training_epochs):
         """
         Train model
@@ -52,22 +75,14 @@ class MonocularAdversarialModel:
                 batch_size: Training batch size
                 training_epochs: Number of training epochs
         """
-
-        # Learning rate halving callback function
-        def halve_lr(epoch, curr_lr):
-            # Epochs are zero-indexed
-            if (epoch < 10): # Halves at epoch 11
-                return curr_lr
-            else:
-                if (epoch % 10 == 0): # Halves every 10 epochs
-                    print('[*] Halving learning rate (=',curr_lr,' -> ',(curr_lr / 2.0),')',sep='')
-                    return curr_lr / 2.0
-                else:
-                    return curr_lr
-        callback = [callbacks.LearningRateScheduler(schedule=halve_lr, verbose=0)]
+        # Learning rate halving callback
+        learning_rate_callback = self.__learning_rate_halving(10, 5)
+        callbacks_list = [callbacks.LearningRateScheduler(schedule=learning_rate_callback, verbose=0)]
         
-        # Training data generators
         training_data_df = pd.read_hdf(train_df_file, 'df')
+        num_samples = training_data_df.shape[0]
+        steps_per_epoch = num_samples//batch_size
+        # Training data generators
         adversarialDatagen = self.adversarial_datagen(training_data_df, self.img_shape[0], self.img_shape[1],
             batch_size)
         discriminatorValidDatagen = self.discriminator_valid_datagen(training_data_df, self.img_shape[0], self.img_shape[1],
@@ -79,27 +94,25 @@ class MonocularAdversarialModel:
         self.generator.predict(adversarialDatagen.__next__()[0])
         self.discriminator.predict(discriminatorValidDatagen.__next__()[0])
         self.discriminator.predict(discriminatorInvalidDatagen.__next__()[0])
-        ###
+        #####################################################
 
-        num_samples = training_data_df.shape[0]
-        steps_per_epoch = num_samples//batch_size
-        # Train discriminator and generator successively
-        for i in range(training_epochs):
-            print('[-] Adversarial model training epoch [',i+1,'/',training_epochs,']',sep='')
+        # Train discriminator and adversarial model successively
+        for e in range(1, training_epochs+1):
+            print('[-] Adversarial model training epoch [',e,'/',training_epochs,']',sep='')
             print('[-] Discriminator Valid')
             #self.discriminator.fit_generator(discriminatorValidDatagen, steps_per_epoch=steps_per_epoch,
-            #    epochs=i+1, initial_epoch=i, verbose=1)
+            #    epochs=e, initial_epoch=e-1, callbacks=callbacks_list, verbose=1)
             print('[-] Discriminator Invalid')
             #self.discriminator.fit_generator(discriminatorInvalidDatagen, steps_per_epoch=steps_per_epoch,
-            #    epochs=i+1, initial_epoch=i, verbose=1)
+            #    epochs=e, initial_epoch=e-1, verbose=1)
             print('[-] Adversarial model')
             self.adversarial_model.fit_generator(adversarialDatagen, steps_per_epoch=steps_per_epoch,
-                epochs=i+1, initial_epoch=i, verbose=1)
+                epochs=e, initial_epoch=e-1, verbose=1)
 
             # Save model every x epochs
-            if (i % self.args.save_per == 0):
-                postfix = '_epoch_' + str(i+1)
-                print('[*] Saving model at epoch',i+1)
+            if (e % self.args.save_per == 0):
+                postfix = '_epoch_' + str(e)
+                print('[*] Saving model at epoch',e)
                 self.save_model(postfix)
 
 
@@ -109,7 +122,6 @@ class MonocularAdversarialModel:
             if (not os.path.isdir('trained_models/')):
                 os.makedirs('trained_models/')
             self.generator.save('trained_models/' + self.model_name + postfix + '.h5')
-            self.depth_inference_model.save('trained_models/' + self.model_name + '_depth' + postfix + '.h5')
         else:
             print('[!] Model not defined. Abandoning saving.')
             exit()
@@ -125,6 +137,7 @@ class MonocularAdversarialModel:
         print('[*] Created generator model')
         self.create_discriminator(self.omega)
         print('[*] Created discriminator model')
+
         # Synthesize adversarial model
         prevReprojections = [self.generator.output[0], self.generator.output[2],
                              self.generator.output[4], self.generator.output[6]]
@@ -142,21 +155,18 @@ class MonocularAdversarialModel:
         validationPrev = self.discriminator([self.generator.input[0]] + prevReprojections)
         validationNext = self.discriminator([self.generator.input[0]] + nextReprojections)
         # Adversarial model
-        self.adversarial_model = Model(inputs=self.generator.input,
-            outputs=(perScaleReprojections))
-            # + [validationPrev, validationNext]))
+        self.adversarial_model = Model(inputs=self.generator.input, outputs=perScaleReprojections)
+        print('[*] Created adversarial model')
 
         # Compile models
+        # Discriminator
         adam_opt = Adam(lr=10e-4)
         self.discriminator.compile(adam_opt, loss='binary_crossentropy')
-
+        # Adversarial
         self.discriminator.trainable = False
-        loss_list = ([perScaleMinMAE for _ in range(4)])
-                     #[None for _ in range(2)])
-        loss_weights = ([1 for _ in range(4)])
-                        #[0.005/2 for _ in range(2)])
+        loss_list = ([extras.perScaleMinMAE for _ in range(4)])
+        loss_weights = ([1/4 for _ in range(4)])
         self.adversarial_model.compile(adam_opt, loss=loss_list, loss_weights=loss_weights)
-        print('[*] Created adversarial model')
 
 
     def create_generator(self):
@@ -166,7 +176,7 @@ class MonocularAdversarialModel:
         # Generator modules
         depth_encoder, depth_encoder_skip = self.create_depth_encoder()
         depth_decoder = self.create_depth_decoder(depth_encoder_skip.output_shape)
-        pose_net = self.create_pose_net(depth_encoder.output_shape)
+        pose_net = self.create_pose_net()
         reprojection_module = self.create_reprojection_module()
 
         # Synthesize generator model
@@ -179,12 +189,11 @@ class MonocularAdversarialModel:
         depth_features_next = depth_encoder(next_frame)
         # Inverse depth and pose
         inverseDepths = depth_decoder(depth_encoder_curr)
-        poses = pose_net([depth_encoder_curr[0], depth_features_prev, depth_features_next])
+        poses = pose_net([curr_frame, prev_frame, next_frame])
         # Reprojections
         reprojections = reprojection_module([prev_frame, next_frame, poses] + inverseDepths)
         # Models
         self.generator = Model(inputs=[curr_frame, prev_frame, next_frame], outputs=(reprojections + inverseDepths))
-        self.depth_inference_model = Model(inputs=[curr_frame, prev_frame, next_frame], outputs=inverseDepths)
 
 
     def create_depth_encoder(self):
@@ -239,14 +248,15 @@ class MonocularAdversarialModel:
                 dec = UpSampling2D(size=(2,2))(dec)
             if (skip_layer != None):
                 dec = Concatenate()([skip_layer, dec])
-            dec = Conv2D(filters=filters, kernel_size=3, strides=1, padding='same', activation='sigmoid')(dec)
+            dec = Conv2D(filters=filters, kernel_size=3, padding='same', activation='relu')(dec)
             return dec
 
         def generate_disparity(prev_layer, prev_disp=None):
             if prev_disp is not None:
                 prev_disp_up = UpSampling2D(size=(2,2), interpolation='nearest')(prev_disp)
                 prev_layer = Concatenate()([prev_layer, prev_disp_up])
-            disp = Conv2D(filters=1, kernel_size=3, padding='same', activation='relu')(prev_layer)
+            disp = Conv2D(filters=1, kernel_size=3, padding='same')(prev_layer)
+            disp = Lambda(extras.dispActivation)(disp)
             return disp
 
         # Inputs
@@ -283,29 +293,34 @@ class MonocularAdversarialModel:
         return depth_decoder
 
 
-    def create_pose_net(self, depth_encoder_latent_shape):
+    def create_pose_net(self):
         """
         Creates and returns the pose estimation network
-            Inputs:
-                depth_encoder_latent_shape: Depth encoder latent features shape
             Outputs:
                 pose_net: Pose estimation network model
         """
-        # Input depth features
-        depth_features_curr = Input(shape=depth_encoder_latent_shape[1:])
-        depth_features_prev = Input(shape=depth_encoder_latent_shape[1:])
-        depth_features_next = Input(shape=depth_encoder_latent_shape[1:])
-        # Estimate target to source poses from latent depth features
-        pconv0curr = Conv2D(filters=256, kernel_size=1, padding='same', activation='relu')(depth_features_curr)
-        pconv0prev = Conv2D(filters=256, kernel_size=1, padding='same', activation='relu')(depth_features_prev)
-        pconv0next = Conv2D(filters=256, kernel_size=1, padding='same', activation='relu')(depth_features_next)
+        # Inputs
+        frame_curr = Input(shape=self.img_shape)
+        frame_prev = Input(shape=self.img_shape)
+        frame_next = Input(shape=self.img_shape)
+        # Pose network 
+        adjacent_frames = Concatenate()([frame_curr, frame_prev, frame_next])
+        def enc_layer(prev_layer, filters, kernel=3):
+            enc = Conv2D(filters=filters, kernel_size=kernel, strides=2, padding='same', activation='relu')(prev_layer) 
+            return enc
+        pose_enc1 = enc_layer(adjacent_frames, 32, kernel=5)
+        pose_enc2 = enc_layer(pose_enc1, 64)
+        pose_enc3 = enc_layer(pose_enc2, 128)
+        pose_enc4 = enc_layer(pose_enc3, 256)
+        pose_enc5 = enc_layer(pose_enc4, 512)
+        pose_enc6 = enc_layer(pose_enc5, 512)
+        pose_enc7 = enc_layer(pose_enc6, 512)
+        pose_out = Conv2D(filters=12, kernel_size=1, padding='same', activation='linear')(pose_enc7)
+        poses = GlobalAveragePooling2D()(pose_out)
 
-        poseFeatures = Concatenate()([pconv0curr, pconv0prev, pconv0next])
-        pconv1 = Conv2D(filters=256, kernel_size=3, strides=2, padding='same', activation='relu')(poseFeatures)
-        pconv2 = Conv2D(filters=256, kernel_size=3, strides=2, padding='same', activation='relu')(pconv1)
-        pconv3 = Conv2D(filters=12, kernel_size=1, padding='same', activation='linear')(pconv2)
-        poses = GlobalAveragePooling2D()(pconv3)
-        pose_net = Model(inputs=[depth_features_curr, depth_features_prev, depth_features_next], outputs=poses)
+        # Model
+        pose_net = Model(inputs=[frame_curr, frame_prev, frame_next], outputs=poses)
+        #pose_net.summary()
         return pose_net
 
 
@@ -329,21 +344,23 @@ class MonocularAdversarialModel:
             [0, 1000/2.36, 540/2.36], [0, 0, 1]])
         #intrinsicsMatrix = np.array([[1, 0, 0.5],
         #    [0, 1, 0.5], [0, 0, 1]])
+        #intrinsicsMatrix = np.array([[0.021, 0, self.img_shape[1]//2],
+        #    [0, 0.021, self.img_shape[0]//2], [0, 0, 1]])
 
         # Upsample and normalize inverse depth maps
         inverseDepth2Up = UpSampling2D(size=(2,2), interpolation='nearest')(inverseDepth2)
         inverseDepth3Up = UpSampling2D(size=(4,4), interpolation='nearest')(inverseDepth3)
         inverseDepth4Up = UpSampling2D(size=(8,8), interpolation='nearest')(inverseDepth4)
-        depthMap1 = Lambda(inverseDepthNormalization)(inverseDepth1)
-        depthMap2 = Lambda(inverseDepthNormalization)(inverseDepth2Up)
-        depthMap3 = Lambda(inverseDepthNormalization)(inverseDepth3Up)
-        depthMap4 = Lambda(inverseDepthNormalization)(inverseDepth4Up)
+        depthMap1 = Lambda(extras.inverseDepthNormalization)(inverseDepth1)
+        depthMap2 = Lambda(extras.inverseDepthNormalization)(inverseDepth2Up)
+        depthMap3 = Lambda(extras.inverseDepthNormalization)(inverseDepth3Up)
+        depthMap4 = Lambda(extras.inverseDepthNormalization)(inverseDepth4Up)
 
         # Create reprojections for each depth map scale from highest to lowest
         reprojections = []
         for depthMap in [depthMap1, depthMap2, depthMap3, depthMap4]:
-            prevToTarget = ProjectionLayer(intrinsicsMatrix)([prev_frame, depthMap, posePrev])
-            nextToTarget = ProjectionLayer(intrinsicsMatrix)([next_frame, depthMap, poseNext])
+            prevToTarget = extras.ProjectionLayer(intrinsicsMatrix)([prev_frame, depthMap, posePrev])
+            nextToTarget = extras.ProjectionLayer(intrinsicsMatrix)([next_frame, depthMap, poseNext])
             reprojections += [prevToTarget, nextToTarget]
 
         reprojection_module = Model(inputs=[prev_frame, next_frame, poses,

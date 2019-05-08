@@ -15,14 +15,9 @@ class ModelTests:
         self.args = self.parse_args()
         # Model parameters
         # Should customize for each separate model
-        custom_objects = {'ProjectionLayer': ProjectionLayer}
+        custom_objects = {'ProjectionLayer': ProjectionLayer, 'dispActivation': dispActivation}
         self.test_model= load_model(self.args.model_file, custom_objects=custom_objects)
         self.img_shape = self.test_model.inputs[0].shape[1:]
-
-        # ?????
-        from PIL import ImageFile
-        ImageFile.LOAD_TRUNCATED_IMAGES = True
-        # ?????
 
 
     def parse_args(self):
@@ -34,7 +29,7 @@ class ModelTests:
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='Model testing script.')
         parser.add_argument('--infer_depth', action='store_true', help='Infer depth from input images.', default=False)
-        parser.add_argument('--test_generator', action='store_true', help='Test generator model.', default=False)
+        parser.add_argument('--create_reprojections', action='store_true', help='Get reprojections from model.', default=False)
         parser.add_argument('--test_dataframe', type=str, help='File containing the test dataFrame.', default=None)
         parser.add_argument('--n_tests', type=int, help='Number of tests.', default=1)
         parser.add_argument('--model_file', type=str, help='File that model is saved at (.h5).', default='test_model.h5')
@@ -42,22 +37,20 @@ class ModelTests:
         return args
 
  
-    def test_generator_model(self, test_df_file, n_tests):
+    def create_reprojections(self, test_df_file, n_tests):
         """
-        Tests generator model
+        Gets model reprojections and plots them
             Inputs:
                 test_df_file: Test data dataFrame file (.h5, 'df' key)
                 n_tests: Number of tests to perform
         """
-        # Training data generators
+        # Training data generator
         test_data_df = pd.read_hdf(test_df_file, 'df')
         generator_tests_datagen = self.test_datagen(test_data_df, self.img_shape[0],
             self.img_shape[1], n_tests)
-
-        # Test model
-        test_data = generator_tests_datagen.__next__()
         # Predict outputs 
-        outputs = self.test_model.predict(test_data)
+        test_data = generator_tests_datagen.__next__()
+        outputs = self.test_model.predict(test_data)[:8]
         for i in range(n_tests):
             print('[-] Test [',i+1,'/',n_tests,']',sep='')
 
@@ -111,9 +104,9 @@ class ModelTests:
             plt.show()
 
 
-    def test_depth_model(self, test_df_file, n_tests):
+    def infer_depth(self, test_df_file, n_tests):
         """
-        Tests depth inference model
+        Infers depth of input image and plots
             Inputs:
                 test_df_file: Test data dataFrame file (.h5, 'df' key)
                 n_tests: Number of tests to perform
@@ -122,13 +115,16 @@ class ModelTests:
         test_data_df = pd.read_hdf(test_df_file, 'df')
         depth_tests_datagen = self.test_datagen(test_data_df, self.img_shape[0],
             self.img_shape[1], n_tests)
-
-        # Test model
-        test_data = depth_tests_datagen.__next__()
         # Infer depth
-        inverse_depth = self.test_model.predict(test_data[0])
+        test_data = depth_tests_datagen.__next__()
+        inverse_depth = self.test_model.predict(test_data)[8:]
         for i in range(n_tests):
             print('[-] Test [',i+1,'/',n_tests,']',sep='')
+
+            depth1 = 1/inverse_depth[0][i,:,:,0]
+            depth2 = 1/inverse_depth[1][i,:,:,0]
+            depth3 = 1/inverse_depth[2][i,:,:,0]
+            depth4 = 1/inverse_depth[3][i,:,:,0]
 
             # Print results
             plt.figure(i)
@@ -138,19 +134,19 @@ class ModelTests:
 
             plt.subplot(323)
             plt.title('Inferred depth (scale 1)')
-            plt.imshow(inverse_depth[0][i,:,:,0])
+            plt.imshow(depth1)
             
             plt.subplot(324)
             plt.title('Inferred depth (scale 2)')
-            plt.imshow(inverse_depth[1][i,:,:,0])
+            plt.imshow(depth2)
             
             plt.subplot(325)
             plt.title('Inferred depth (scale 3)')
-            plt.imshow(inverse_depth[2][i,:,:,0])
+            plt.imshow(depth3)
             
             plt.subplot(326)
             plt.title('Inferred depth (scale 4)')
-            plt.imshow(inverse_depth[3][i,:,:,0])
+            plt.imshow(depth4)
             plt.show()
 
 
@@ -197,9 +193,9 @@ if __name__ == '__main__':
     model_tests = ModelTests()
 
     if model_tests.args.infer_depth == True:
-        model_tests.test_depth_model(model_tests.args.test_dataframe, model_tests.args.n_tests)
-    elif model_tests.args.test_generator == True:
-        model_tests.test_generator_model(model_tests.args.test_dataframe, model_tests.args.n_tests)
+        model_tests.infer_depth(model_tests.args.test_dataframe, model_tests.args.n_tests)
+    elif model_tests.args.create_reprojections == True:
+        model_tests.create_reprojections(model_tests.args.test_dataframe, model_tests.args.n_tests)
     else:
         print('[!] Unknown operation argument, use -h flag for help.')
 
