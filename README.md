@@ -2,6 +2,7 @@
 This project aims to establish a method for estimating the volume of foods in a input image using deep learning monocular depth estimation techniques.
 
 ## Todo
+- Implementing model2.py. Work on it more (inference does not work 'axes don't match array')
 - scaleMinMAE is not working properly. Compare again with per-reprojection MAE and keep testing
 - Verify that everything is working OK up until now
 - Improve discriminator (maybe add pose as conditional input)

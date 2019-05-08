@@ -34,23 +34,6 @@ class ProjectionLayer(Layer):
         return input_shape[0]
 
 
-def dispActivation(x):
-    """
-    Custom activation function for inverse depth layers
-        Inptus:
-            x: Inverse depth input tensor
-        Outputs:
-            y: a*sigmoid(x) + b
-    """
-    # Calculate alpha, beta from inverse max and min values
-    depthMaxVal = 10
-    depthMinVal = 0.01
-    beta = 1/depthMaxVal
-    alpha = (1/depthMinVal) - beta
-    
-    return alpha*K.sigmoid(x) + beta 
-
-
 def inverseDepthNormalization(disparityMap):
     """
     Normalizes and inverses given disparity map
@@ -59,10 +42,10 @@ def inverseDepthNormalization(disparityMap):
         Outputs:
             depthMap: The corresponding depth map
     """
-    mean = K.mean(disparityMap, axis=[1,2,3], keepdims=True)
-    normalizedDisp = disparityMap / mean
-    #depthMap = 1 / normalizedDisp
-    depthMap = 1 / disparityMap
+    max_depth = 10
+    min_depth = 0.1
+    normalizedDisp = 1/max_depth + (1/min_depth - 1/max_depth)*disparityMap
+    depthMap = 1 / normalizedDisp
     return depthMap
 
 

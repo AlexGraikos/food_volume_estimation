@@ -15,7 +15,7 @@ class ModelTests:
         self.args = self.parse_args()
         # Model parameters
         # Should customize for each separate model
-        custom_objects = {'ProjectionLayer': ProjectionLayer, 'dispActivation': dispActivation}
+        custom_objects = {'ProjectionLayer': ProjectionLayer}
         self.test_model= load_model(self.args.model_file, custom_objects=custom_objects)
         self.img_shape = self.test_model.inputs[0].shape[1:]
 
@@ -121,10 +121,10 @@ class ModelTests:
         for i in range(n_tests):
             print('[-] Test [',i+1,'/',n_tests,']',sep='')
 
-            depth1 = 1/inverse_depth[0][i,:,:,0]
-            depth2 = 1/inverse_depth[1][i,:,:,0]
-            depth3 = 1/inverse_depth[2][i,:,:,0]
-            depth4 = 1/inverse_depth[3][i,:,:,0]
+            depth1 = inverse_depth[0][i,:,:,0]
+            depth2 = inverse_depth[1][i,:,:,0]
+            depth3 = inverse_depth[2][i,:,:,0]
+            depth4 = inverse_depth[3][i,:,:,0]
 
             # Print results
             plt.figure(i)
