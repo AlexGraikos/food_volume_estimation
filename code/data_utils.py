@@ -5,7 +5,6 @@ import pandas as pd
 import cv2
 
 class DataUtils():
-
     def __init__(self):
         self.args = self.parse_args()
 
@@ -31,7 +30,7 @@ class DataUtils():
         return args
 
 
-    def createDirectoryDataFrame(self, directory, df_file):
+    def createDirectoryDataFrame(self, directory, df_file, stride=1):
         """
         Creates a sequence dataFrame from a directory of frames
         The dataFrame is saved in df_file (HDF5 format, key=df)
@@ -42,34 +41,11 @@ class DataUtils():
         """
 
         # Concat all and save
-        directory_df = self.__createSequenceDataFrame(directory)
-        directory_df.to_hdf(df_file, key='df', format='fixed', mode='w')
+        directory_df = self.__createSequenceDataFrame(directory, stride)
+        directory_df.to_csv(df_file, index=False)
         print('[*] Total frames:', directory_df.shape[0])
         print('[*] Finished creating set dataFrame and saved in', '"'+os.path.abspath(df_file)+'"')
  
-
-    def __createSequenceDataFrame(self, img_directory, stride=1):
-        """
-        Creates a frame sequence dataFrame from images in given directory
-        The created dataFrame has columns [curr_frame, prev_frame, next_frame]
-            Inputs:
-                img_directory: The directory for which to create the sequence dataframe
-                stride: Distance between frames [prev <-> curr <-> next]
-            Outputs:
-                sequence_df: The image sequence dataFrame
-        """
-        image_files = [os.path.join(img_directory,f) for f in os.listdir(img_directory)
-            if os.path.isfile(os.path.join(img_directory,f))]
-        image_files.sort() # Sort in sequential order
-
-        # Create sequential frame triplet dataframe
-        curr_frames = image_files[stride:-stride:stride]
-        prev_frames = image_files[:-2*stride:stride]
-        next_frames = image_files[2*stride::stride]
-        frame_triplets = np.transpose(np.array([curr_frames, prev_frames, next_frames]))
-        sequence_df = pd.DataFrame(data=frame_triplets, columns=['curr_frame', 'prev_frame', 'next_frame'])
-        return sequence_df
-
 
     def createSetDataFrame(self, data_source_file, df_file, stride=1):
         """
@@ -95,12 +71,36 @@ class DataUtils():
 
         # Concat all and save
         set_df = pd.concat(sequences, axis=0, ignore_index=True)
-        set_df.to_hdf(df_file, key='df', format='fixed', mode='w')
+        set_df.to_csv(df_file, index=False)
         print('[*] Total frames:', set_df.shape[0])
         print('[*] Finished creating set dataFrame and saved in', '"'+os.path.abspath(df_file)+'"')
-        
 
-    def createSet(self, data_source_file, target_dir, target_size=None, stride=2, interpolation='nearest'):
+
+    def __createSequenceDataFrame(self, img_directory, stride=1):
+        """
+        Creates a frame sequence dataFrame from images in given directory
+        The created dataFrame has columns [curr_frame, prev_frame, next_frame]
+            Inputs:
+                img_directory: The directory for which to create the sequence dataframe
+                stride: Distance between frames [prev <-> curr <-> next]
+            Outputs:
+                sequence_df: The image sequence dataFrame
+        """
+        image_files = [os.path.join(img_directory,f) for f in os.listdir(img_directory)
+            if os.path.isfile(os.path.join(img_directory,f))]
+        image_files.sort() # Sort in sequential order
+        image_files = list(map(os.path.abspath, image_files))
+
+        # Create sequential frame triplet dataframe
+        curr_frames = image_files[stride:-stride:stride]
+        prev_frames = image_files[:-2*stride:stride]
+        next_frames = image_files[2*stride::stride]
+        frame_triplets = np.transpose(np.array([curr_frames, prev_frames, next_frames]))
+        sequence_df = pd.DataFrame(data=frame_triplets, columns=['curr_frame', 'prev_frame', 'next_frame'])
+        return sequence_df
+
+
+    def createSet(self, data_source_file, target_dir, target_size, stride, interpolation):
         """
         Creates a set of images from source directories defined in data_source_file 
         Set is filtered with the proposed optical flow preprocessing method
@@ -149,6 +149,7 @@ class DataUtils():
         target_frames = 0
         rejected_frames = 0
         failed_frames = 0
+        source_index = 0
         for source_rgb in data_sources:
             # Generate flow filepath
             dirs_list = os.path.abspath(source_rgb).split('/')
@@ -185,13 +186,15 @@ class DataUtils():
                     continue
 
                 # Compose target file name and save resized image
-                prefix = os.path.basename(os.path.dirname(rgb_file_path)) + '_'
+                prefix = 'source_' + str(source_index)
                 target_file_path = os.path.join(target_dir, prefix + frame_name_rgb)
                 if target_size is None:
                     target_size = img.shape[:2]
                 img_resized = cv2.resize(img, target_size[::-1], interpolation=cv2_interp)
                 cv2.imwrite(target_file_path, img_resized)
                 target_frames += 1
+
+            source_index += 1
 
         print('[*] Finished creating set')
         print('[*] Total frames: %d, Target frames: %d, Rejected frames: %d, Failed frames: %d' % \
@@ -210,7 +213,8 @@ if __name__ == '__main__':
         imgUtils.createSetDataFrame(imgUtils.args.data_source, imgUtils.args.save_target,
         stride=imgUtils.args.stride)
     elif imgUtils.args.createDirDf == True:
-        imgUtils.createDirectoryDataFrame(imgUtils.args.data_source, imgUtils.args.save_target)
+        imgUtils.createDirectoryDataFrame(imgUtils.args.data_source, imgUtils.args.save_target,
+            imgUtils.args.stride)
     else:
         print('[!] Unknown operation argument, use -h flag for help.')
 
