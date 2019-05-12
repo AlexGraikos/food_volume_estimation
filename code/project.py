@@ -19,7 +19,8 @@
 Modified from Spatial Transformer Networks:
 https://github.com/tensorflow/models/blob/master/transformer/spatial_transformer.py
 
-Taken from https://github.com/tensorflow/models/tree/master/research/struct2depth
+Taken from:
+    https://github.com/tensorflow/models/tree/master/research/struct2depth
 Modified by Alexander Graikos
 """
 
@@ -46,8 +47,10 @@ def inverse_warp(img, depth, pose_vector, intrinsic_mat, intrinsic_mat_inv):
     # Get transformation matrix from pose vector
     pose_mat = _egomotion_vec2mat(pose_vector, batch_size)
     # Expand intrinsics to batch size
-    intrinsic_mat = tf.tile(tf.expand_dims(intrinsic_mat, axis=0), [batch_size, 1, 1])
-    intrinsic_mat_inv = tf.tile(tf.expand_dims(intrinsic_mat_inv, axis=0), [batch_size, 1, 1])
+    intrinsic_mat = tf.tile(tf.expand_dims(intrinsic_mat, axis=0),
+                            [batch_size, 1, 1])
+    intrinsic_mat_inv = tf.tile(tf.expand_dims(intrinsic_mat_inv, axis=0),
+                                [batch_size, 1, 1])
 
     depth = tf.reshape(depth, [batch_size, 1, img_height * img_width])
     grid = _meshgrid_abs(img_height, img_width)
@@ -59,8 +62,8 @@ def inverse_warp(img, depth, pose_vector, intrinsic_mat, intrinsic_mat_inv):
     # Get projection matrix for target camera frame to source pixel frame
     hom_filler = tf.constant([0.0, 0.0, 0.0, 1.0], shape=[1, 1, 4])
     hom_filler = tf.tile(hom_filler, [batch_size, 1, 1])
-    intrinsic_mat_hom = tf.concat(
-            [intrinsic_mat, tf.zeros([batch_size, 3, 1])], axis=2)
+    intrinsic_mat_hom = tf.concat([intrinsic_mat, tf.zeros([batch_size, 3, 1])],
+                                  axis=2)
     intrinsic_mat_hom = tf.concat([intrinsic_mat_hom, hom_filler], axis=1)
     proj_target_cam_to_source_pixel = tf.matmul(intrinsic_mat_hom, pose_mat)
     source_pixel_coords = _cam2pixel(cam_coords_hom,

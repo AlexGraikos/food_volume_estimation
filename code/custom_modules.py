@@ -1,36 +1,37 @@
 import tensorflow as tf
 import keras.backend as K
 from keras.layers import Layer
-
 from project import *
 
 class ProjectionLayer(Layer):
     """
-    Wraps the projective inverse warp utility function as a Keras layer
-    Initialize with a camera intrinsics matrix which is kept constant
-    during training
+    Projective inverse warping layer.
+    Initialize with the camera intrinsics matrix which is kept constant
+    during training.
     """
-
-    def __init__(self, intrinsicsMatrix=None, **kwargs):
-        if intrinsicsMatrix is None:
-            self.intrinsicsMatrix = np.array([[1, 0, 0.5],
-                [0, 1, 0.5], [0, 0, 1]])
+    def __init__(self, intrinsics_mat=None, **kwargs):
+        self.POSE_SCALING = 0.01
+        if intrinsics_mat is None:
+            self.intrinsics_mat = np.array([[1, 0, 0.5],
+                                            [0, 1, 0.5],
+                                            [0, 0,   1]])
         else:
-            self.intrinsicsMatrix = intrinsicsMatrix
-        self.intrinsicsMatrixInverse = np.linalg.inv(self.intrinsicsMatrix)
+            self.intrinsics_mat = intrinsics_mat
+        self.intrinsics_mat_inv = np.linalg.inv(self.intrinsics_mat)
         super(ProjectionLayer, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.intrinsicsTensor = K.variable(self.intrinsicsMatrix)
-        self.intrinsicsInverseTensor = K.variable(self.intrinsicsMatrixInverse)
+        self.intrinsics_mat_tensor = K.variable(self.intrinsics_mat)
+        self.intrinsics_mat_inv_tensor = K.variable(self.intrinsics_mat_inv)
         super(ProjectionLayer, self).build(input_shape)
 
     def call(self, x):
         source_img = x[0]
         depth_map = x[1]
-        pose = x[2]*0.01
+        pose = x[2] * self.POSE_SCALING
         reprojected_img, _ = inverse_warp(source_img, depth_map, pose,
-            self.intrinsicsTensor, self.intrinsicsInverseTensor)
+                                          self.intrinsics_mat_tensor,
+                                          self.intrinsics_mat_inv_tensor)
         return reprojected_img
 
     def compute_output_shape(self, input_shape):
@@ -39,7 +40,8 @@ class ProjectionLayer(Layer):
 
 class ReflectionPadding2D(Layer):
     """
-    Reflection padding layer
+    Reflection padding layer.
+    Padding (p1,p2) is applied as ([p1 rows p1], [p2 cols p2]).
     """
     def __init__(self, padding=(1,1), **kwargs):
         self.padding = tuple(padding)
@@ -47,37 +49,43 @@ class ReflectionPadding2D(Layer):
 
     def call(self, x):
         return tf.pad(x, [[0,0], [self.padding[0], self.padding[0]],
-            [self.padding[1], self.padding[1]], [0,0]], 'REFLECT')
+                          [self.padding[1], self.padding[1]], [0,0]],
+                      'REFLECT')
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1]+2*self.padding[0],
-            input_shape[2]+2*self.padding[1], input_shape[3])
+                input_shape[2]+2*self.padding[1], input_shape[3])
 
 
-def inverseDepthNormalization(disparityMap):
+def normalize_inverse_depth(disparityMap):
     """
-    Normalizes and inverses given disparity map
+    Normalizes and inverses disparities to create depth map with
+    given max and min depth values.
         Inputs:
-            disparityMap: Network-generated disparity map to be normalized
+            disparityMap: Network-generated disparity map to be normalized.
         Outputs:
-            depthMap: The corresponding depth map
+            depthMap: The corresponding depth map.
     """
-    max_depth = 10
-    min_depth = 0.1
-    normalizedDisp = 1/max_depth + (1/min_depth - 1/max_depth)*disparityMap
+    MAX_DEPTH = 10
+    MIN_DEPTH = 0.1
+    MAX_DISP = 1 / MIN_DEPTH
+    MIN_DISP = 1 / MAX_DEPTH
+
+    normalizedDisp = MIN_DISP + (MAX_DISP - MIN_DISP) * disparityMap
     depthMap = 1 / normalizedDisp
     return depthMap
 
 
-def perScaleMinMAE(y_true, y_pred):
+def per_scale_MAE(y_true, y_pred):
     """
-    Computes the minimum mean absolute error between the target image and 
-    the source to target reprojections
+    Computes the minimum MAE between the target image and the source
+    to target reprojections of scale s.
         Inputs:
-            y_true: Target image
-            y_pred: Source to target reprojections concatenated along the channel axis
+            y_true: Target image.
+            y_pred: Source to target reprojections concatenated along 
+                    the channel axis.
         Outputs:
-            min_error: Minimum MAE between the two reprojections
+            scale_min_mae: Minimum MAE between the two reprojections.
     """
     # Split channels to separate inputs
     #prev_frame = y_pred[:,:,:,:3]
@@ -88,37 +96,46 @@ def perScaleMinMAE(y_true, y_pred):
     #mae_prev = K.mean(K.abs(y_true-prev_frame), axis=-1, keepdims=True)
     #mae_next = K.mean(K.abs(y_true-next_frame), axis=-1, keepdims=True)
     #minMAE = K.minimum(mae_prev, mae_next)
-    mae_reprojection_prev = K.mean(K.abs(y_true-reprojection_prev), axis=-1, keepdims=True)
-    mae_reprojection_next = K.mean(K.abs(y_true-reprojection_next), axis=-1, keepdims=True)
-    minMAE_reprojection = K.minimum(mae_reprojection_prev, mae_reprojection_next)
-    # SSIM
-    ssim_reprojection_prev = ssim(reprojection_prev, y_true)
-    ssim_reprojection_next = ssim(reprojection_next, y_true)
-    minSSIM_reprojection = K.minimum(ssim_reprojection_prev, ssim_reprojection_next)
+    reprojection_prev_mae = K.mean(K.abs(y_true - reprojection_prev),
+                                   axis=-1, keepdims=True)
+    reprojection_next_mae = K.mean(K.abs(y_true - reprojection_next),
+                                   axis=-1, keepdims=True)
+    scale_min_mae = K.minimum(reprojection_prev_mae, reprojection_next_mae)
 
     #mask = K.less(minMAE_reprojection, minMAE)
     #minMAE_reprojection *= K.cast(mask, 'float32')
-    return minMAE_reprojection
+    return scale_min_mae 
 
 
-def perScaleMinSSIM(y_true, y_pred):
+def per_scale_SSIM(y_true, y_pred):
+    """
+    Computes the minimum SSIM between the target image and the source
+    to target reprojections of scale s.
+        Inputs:
+            y_true: Target image.
+            y_pred: Source to target reprojections concatenated along 
+                    the channel axis.
+        Outputs:
+            scale_min_ssim: Minimum SSIM between the two reprojections.
+    """
     # Split channels to separate inputs
     #prev_frame = y_pred[:,:,:,:3]
     #next_frame = y_pred[:,:,:,3:6]
     reprojection_prev = y_pred[:,:,:,:3]
     reprojection_next = y_pred[:,:,:,3:]
     # SSIM
-    ssim_reprojection_prev = ssim(reprojection_prev, y_true)
-    ssim_reprojection_next = ssim(reprojection_next, y_true)
-    minSSIM_reprojection = K.minimum(ssim_reprojection_prev, ssim_reprojection_next)
+    reprojection_prev_ssim = ssim(reprojection_prev, y_true)
+    reprojection_next_ssim = ssim(reprojection_next, y_true)
+    scale_min_ssim = K.minimum(reprojection_prev_ssim, reprojection_next_ssim)
 
-    return minSSIM_reprojection
+    return scale_min_ssim
 
 
 def ssim(x, y):
     """
     Computes a differentiable structured image similarity measure
-    Taken from https://github.com/tensorflow/models/tree/master/research/struct2depth
+    Taken from:
+        https://github.com/tensorflow/models/tree/master/research/struct2depth
     """
     c1 = 0.01**2  # As defined in SSIM to stabilize div. by small denominator.
     c2 = 0.03**2

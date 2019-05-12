@@ -1,8 +1,9 @@
+# Directories to ignore
+code/trained_models/*
 datasets/*
 sources/*
-code/trained_models/*
+tests/warping_test/test_images
+
+# Filetypes to ignore
 *.pyc
-*.pdf
-*.png
-*.pfm
-!*.md
+
