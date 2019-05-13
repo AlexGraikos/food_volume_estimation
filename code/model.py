@@ -74,8 +74,8 @@ class MonocularAdversarialModel:
         inverse_depths = self.generator.outputs[8:12]
         per_scale_reprojections = self.generator.outputs[12:]
         self.adversarial = Model(inputs=self.generator.input,
-                                 outputs=(per_scale_reprojections 
-                                          + per_scale_reprojections),
+                                 outputs=(per_scale_reprojections
+                                          + inverse_depths),
                                  name='adversarial')
         print('[*] Created adversarial model')
 
@@ -84,10 +84,12 @@ class MonocularAdversarialModel:
         self.discriminator.compile(adam_opt, loss='binary_crossentropy')
 
         self.discriminator.trainable = False
-        loss_list = ([per_scale_MAE for _ in range(4)] +
-                     [per_scale_SSIM for _ in range(4)])
-        loss_weights = ([0.15 for _ in range(4)] +
-                        [0.85 for _ in range(4)])
+        custom_losses = Losses()
+        loss_list = ([custom_losses.reprojection_loss(masking=False) 
+                      for _ in range(4)] 
+                     + [custom_losses.depth_smoothness() for _ in range(4)])
+        loss_weights = ([1 for _ in range(4)]
+                        + [0.000 for _ in range(4)])
         self.adversarial.compile(adam_opt, loss=loss_list,
                                  loss_weights=loss_weights)
 
@@ -376,10 +378,15 @@ class MonocularAdversarialModel:
 
             # Returns (inputs,outputs) tuple
             batch_size_curr = curr_frame.shape[0]
-            curr_frame_list = [curr_frame for _ in range(8)]
+            curr_frame_list = [curr_frame for _ in range(4)]
+            # Downsample curr frame
+            curr_frame_scales = []
+            for s in [1, 2, 4, 8]:
+                curr_frame_scales += [curr_frame[:,::s,::s,:]]
             #true_labels = [np.ones((batch_size_curr, 1)) for _ in range(2)]
 
-            yield ([curr_frame, prev_frame, next_frame], curr_frame_list)
+            yield ([curr_frame, prev_frame, next_frame], 
+                   (curr_frame_list + curr_frame_scales))
 
 
 

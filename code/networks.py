@@ -38,13 +38,21 @@ class Networks:
                                             + inverse_depths)
         # Concatenate reprojections per-scale for computing per scale min loss
         per_scale_reprojections = [
-            Concatenate(name='scale1_reprojections')([reprojections[0],
+            Concatenate(name='scale1_reprojections')([prev_frame,
+                                                      next_frame, 
+                                                      reprojections[0],
                                                       reprojections[1]]),
-            Concatenate(name='scale2_reprojections')([reprojections[2],
+            Concatenate(name='scale2_reprojections')([prev_frame,
+                                                      next_frame,
+                                                      reprojections[2],
                                                       reprojections[3]]),
-            Concatenate(name='scale3_reprojections')([reprojections[4],
+            Concatenate(name='scale3_reprojections')([prev_frame,
+                                                      next_frame,
+                                                      reprojections[4],
                                                       reprojections[5]]),
-            Concatenate(name='scale4_reprojections')([reprojections[6],
+            Concatenate(name='scale4_reprojections')([prev_frame,
+                                                      next_frame,
+                                                      reprojections[6],
                                                       reprojections[7]])]
         generator = Model(
             inputs=[curr_frame, prev_frame, next_frame],
@@ -115,15 +123,17 @@ class Networks:
                 pose_net: Pose estimation network model.
         """
         # Pose encoder
-        pose_encoder = ResNet18(input_shape=(self.img_shape[0],
-                                             self.img_shape[1], 6),
-                                weights=None, include_top=False)
+        pose_encoder = ResNet18(input_shape=self.img_shape,
+                                weights='imagenet', include_top=False)
         # Inputs
         source_frame = Input(shape=self.img_shape)
         target_frame = Input(shape=self.img_shape)
         concatenated_frames = Concatenate()([source_frame, target_frame])
         # Pose net
-        pose_features = pose_encoder(concatenated_frames)
+        input_pre = ReflectionPadding2D(padding=(1,1))(concatenated_frames)
+        input_pre = Conv2D(filters=3, kernel_size=3,
+                           activation='relu')(input_pre)
+        pose_features = pose_encoder(input_pre)
         pconv0 = Conv2D(filters=256, kernel_size=1, padding='same',
                         activation='relu')(pose_features)
         pconv1 = Conv2D(filters=256, kernel_size=3, padding='same',
@@ -169,10 +179,10 @@ class Networks:
         inverse_depth_2_up = UpSampling2D(size=(2,2))(inverse_depth_2)
         inverse_depth_3_up = UpSampling2D(size=(4,4))(inverse_depth_3)
         inverse_depth_4_up = UpSampling2D(size=(8,8))(inverse_depth_4)
-        depth_map_1 = Lambda(normalize_inverse_depth)(inverse_depth_1)
-        depth_map_2 = Lambda(normalize_inverse_depth)(inverse_depth_2_up)
-        depth_map_3 = Lambda(normalize_inverse_depth)(inverse_depth_3_up)
-        depth_map_4 = Lambda(normalize_inverse_depth)(inverse_depth_4_up)
+        depth_map_1 = InverseDepthNormalization(0.1, 10)(inverse_depth_1)
+        depth_map_2 = InverseDepthNormalization(0.1, 10)(inverse_depth_2_up)
+        depth_map_3 = InverseDepthNormalization(0.1, 10)(inverse_depth_3_up)
+        depth_map_4 = InverseDepthNormalization(0.1, 10)(inverse_depth_4_up)
 
         # Create reprojections for each depth map scale from highest to lowest
         reprojections = []

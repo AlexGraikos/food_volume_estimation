@@ -37,6 +37,13 @@ class ProjectionLayer(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape[0]
 
+    def get_config(self):
+        config = {
+            'intrinsics_mat': self.intrinsics_mat
+        }
+        base_config = super(ProjectionLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
 
 class ReflectionPadding2D(Layer):
     """
@@ -56,95 +63,153 @@ class ReflectionPadding2D(Layer):
         return (input_shape[0], input_shape[1]+2*self.padding[0],
                 input_shape[2]+2*self.padding[1], input_shape[3])
 
+    def get_config(self):
+        config = {
+            'padding': self.padding
+        }
+        base_config = super(ReflectionPadding2D, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
-def normalize_inverse_depth(disparityMap):
+
+class InverseDepthNormalization(Layer):
     """
     Normalizes and inverses disparities to create depth map with
-    given max and min depth values.
-        Inputs:
-            disparityMap: Network-generated disparity map to be normalized.
-        Outputs:
-            depthMap: The corresponding depth map.
+    given max and min values.
     """
-    MAX_DEPTH = 10
-    MIN_DEPTH = 0.1
-    MAX_DISP = 1 / MIN_DEPTH
-    MIN_DISP = 1 / MAX_DEPTH
+    def __init__(self, min_depth=1, max_depth=100, **kwargs):
+        self.min_depth = min_depth
+        self.max_depth = max_depth
+        self.min_disp = 1 / max_depth
+        self.max_disp = 1 / min_depth
+        super(InverseDepthNormalization, self).__init__(**kwargs)
 
-    normalizedDisp = MIN_DISP + (MAX_DISP - MIN_DISP) * disparityMap
-    depthMap = 1 / normalizedDisp
-    return depthMap
+    def call(self, x):
+        normalized_disp = (self.min_disp
+                           + (self.max_disp - self.min_disp) * x)
+        depth_map = 1 / normalized_disp
+        return depth_map
 
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
-def per_scale_MAE(y_true, y_pred):
-    """
-    Computes the minimum MAE between the target image and the source
-    to target reprojections of scale s.
-        Inputs:
-            y_true: Target image.
-            y_pred: Source to target reprojections concatenated along 
-                    the channel axis.
-        Outputs:
-            scale_min_mae: Minimum MAE between the two reprojections.
-    """
-    # Split channels to separate inputs
-    #prev_frame = y_pred[:,:,:,:3]
-    #next_frame = y_pred[:,:,:,3:6]
-    reprojection_prev = y_pred[:,:,:,:3]
-    reprojection_next = y_pred[:,:,:,3:]
-    # MAE
-    #mae_prev = K.mean(K.abs(y_true-prev_frame), axis=-1, keepdims=True)
-    #mae_next = K.mean(K.abs(y_true-next_frame), axis=-1, keepdims=True)
-    #minMAE = K.minimum(mae_prev, mae_next)
-    reprojection_prev_mae = K.mean(K.abs(y_true - reprojection_prev),
-                                   axis=-1, keepdims=True)
-    reprojection_next_mae = K.mean(K.abs(y_true - reprojection_next),
-                                   axis=-1, keepdims=True)
-    scale_min_mae = K.minimum(reprojection_prev_mae, reprojection_next_mae)
-
-    #mask = K.less(minMAE_reprojection, minMAE)
-    #minMAE_reprojection *= K.cast(mask, 'float32')
-    return scale_min_mae 
+    def get_config(self):
+        config = {
+            'min_depth': self.min_depth,
+            'max_depth': self.max_depth
+        }
+        base_config = super(InverseDepthNormalization, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
 
-def per_scale_SSIM(y_true, y_pred):
-    """
-    Computes the minimum SSIM between the target image and the source
-    to target reprojections of scale s.
-        Inputs:
-            y_true: Target image.
-            y_pred: Source to target reprojections concatenated along 
-                    the channel axis.
-        Outputs:
-            scale_min_ssim: Minimum SSIM between the two reprojections.
-    """
-    # Split channels to separate inputs
-    #prev_frame = y_pred[:,:,:,:3]
-    #next_frame = y_pred[:,:,:,3:6]
-    reprojection_prev = y_pred[:,:,:,:3]
-    reprojection_next = y_pred[:,:,:,3:]
-    # SSIM
-    reprojection_prev_ssim = ssim(reprojection_prev, y_true)
-    reprojection_next_ssim = ssim(reprojection_next, y_true)
-    scale_min_ssim = K.minimum(reprojection_prev_ssim, reprojection_next_ssim)
+class Losses():
 
-    return scale_min_ssim
+    def reprojection_loss(self, alpha=0.85, masking=True):
+        """
+        Creates reprojection loss function combining MAE and SSIM losses.
+        The reprojection loss is computed per scale by choosing the minimum
+        loss between the previous and next frame reprojections.
+            Inputs:
+                alpha: SSIM loss weight
+            Outputs:
+                reprojection_loss: Reprojection Keras-style loss function
+        """
+        def reprojection_loss_keras(y_true, y_pred):
+            prev_frame = y_pred[:,:,:,:3]
+            next_frame = y_pred[:,:,:,3:6]
+            reprojection_prev = y_pred[:,:,:,6:9]
+            reprojection_next = y_pred[:,:,:,9:12]
+
+            # Reprojection MAE
+            reprojection_prev_mae = K.mean(K.abs(y_true - reprojection_prev),
+                                           axis=-1, keepdims=True)
+            reprojection_next_mae = K.mean(K.abs(y_true - reprojection_next),
+                                           axis=-1, keepdims=True)
+            scale_min_mae = K.minimum(reprojection_prev_mae, 
+                                      reprojection_next_mae)
+            # Reprojection SSIM
+            reprojection_prev_ssim = self.__ssim(y_true, reprojection_prev)
+            reprojection_next_ssim = self.__ssim(y_true, reprojection_next)
+            scale_min_ssim = K.minimum(reprojection_prev_ssim,
+                                       reprojection_next_ssim)
+            # Source frame MAE
+            prev_mae = K.mean(K.abs(y_true - prev_frame), axis=-1,
+                              keepdims=True)
+            next_mae = K.mean(K.abs(y_true - next_frame), axis=-1,
+                              keepdims=True)
+            source_min_mae  = K.minimum(prev_mae, next_mae)
+            # Source frame SSIM
+            prev_ssim = self.__ssim(y_true, prev_frame)
+            next_ssim = self.__ssim(y_true, next_frame)
+            source_min_ssim = K.minimum(prev_ssim, next_ssim)
+
+            # Compute and apply mask to reprojection loss
+            reprojection_loss = (alpha * K.mean(scale_min_ssim) 
+                                 + (1 - alpha) * K.mean(scale_min_mae))
+            source_loss = (alpha * K.mean(source_min_ssim)
+                           + (1 - alpha) * K.mean(source_min_mae))
+            mask = K.less(reprojection_loss, source_loss)
+            if masking:
+                reprojection_loss *= K.cast(mask, 'float32')
+
+            return reprojection_loss
+
+        return reprojection_loss_keras
 
 
-def ssim(x, y):
-    """
-    Computes a differentiable structured image similarity measure
-    Taken from:
-        https://github.com/tensorflow/models/tree/master/research/struct2depth
-    """
-    c1 = 0.01**2  # As defined in SSIM to stabilize div. by small denominator.
-    c2 = 0.03**2
-    mu_x = tf.contrib.slim.avg_pool2d(x, 3, 1, 'VALID')
-    mu_y = tf.contrib.slim.avg_pool2d(y, 3, 1, 'VALID')
-    sigma_x = tf.contrib.slim.avg_pool2d(x**2, 3, 1, 'VALID') - mu_x**2
-    sigma_y = tf.contrib.slim.avg_pool2d(y**2, 3, 1, 'VALID') - mu_y**2
-    sigma_xy = tf.contrib.slim.avg_pool2d(x * y, 3, 1, 'VALID') - mu_x * mu_y
-    ssim_n = (2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)
-    ssim_d = (mu_x**2 + mu_y**2 + c1) * (sigma_x + sigma_y + c2)
-    ssim = ssim_n / ssim_d
-    return tf.clip_by_value((1 - ssim) / 2, 0, 1)
+    def depth_smoothness(self):
+        """
+        Computes image-aware depth smoothness loss.
+        Taken from:
+            https://github.com/tensorflow/models/tree/master/research/struct2depth
+        Modified by Alexander Graikos.
+        """
+        def depth_smoothness_keras(y_true, y_pred):
+            img = y_true
+            # Normalize inverse depth by mean
+            inverse_depth = y_pred / (tf.reduce_mean(y_pred) + 1e-6)
+            # Compute depth smoothness loss
+            inverse_depth_dx = self.__gradient_x(inverse_depth)
+            inverse_depth_dy = self.__gradient_y(inverse_depth)
+            image_dx = self.__gradient_x(img)
+            image_dy = self.__gradient_y(img)
+            weights_x = tf.exp(-tf.reduce_mean(tf.abs(image_dx), 3, keepdims=True))
+            weights_y = tf.exp(-tf.reduce_mean(tf.abs(image_dy), 3, keepdims=True))
+            smoothness_x = inverse_depth_dx * weights_x
+            smoothness_y = inverse_depth_dy * weights_y
+            return (tf.reduce_mean(abs(smoothness_x)) 
+                    + tf.reduce_mean(abs(smoothness_y)))
+
+        return depth_smoothness_keras
+
+
+    def __ssim(self, x, y):
+        """
+        Computes a differentiable structured image similarity measure.
+        Taken from:
+            https://github.com/tensorflow/models/tree/master/research/struct2depth
+        Modified by Alexander Graikos.
+        """
+        c1 = 0.01**2  # As defined in SSIM to stabilize div. by small denom.
+        c2 = 0.03**2
+        mu_x = K.pool2d(x, (3,3), (1,1), 'valid', pool_mode='avg')
+        mu_y = K.pool2d(y, (3,3), (1,1), 'valid', pool_mode='avg')
+        sigma_x = (K.pool2d(x**2, (3,3), (1,1), 'valid', pool_mode='avg')
+                   - mu_x**2)
+        sigma_y = (K.pool2d(y**2, (3,3), (1,1), 'valid', pool_mode='avg')
+                   - mu_y**2)
+        sigma_xy = (K.pool2d(x * y, (3,3), (1,1), 'valid', pool_mode='avg') 
+                    - mu_x * mu_y)
+        ssim_n = (2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)
+        ssim_d = (mu_x**2 + mu_y**2 + c1) * (sigma_x + sigma_y + c2)
+        ssim = ssim_n / ssim_d
+        return K.clip((1 - ssim) / 2, 0, 1)
+
+
+    def __gradient_x(self, img):
+        return img[:, :, :-1, :] - img[:, :, 1:, :]
+
+
+    def __gradient_y(self, img):
+        return img[:, :-1, :, :] - img[:, 1:, :, :]
+
+

@@ -15,7 +15,9 @@ class ModelTests:
         self.args = self.parse_args()
         # Load model architecture with custom model objects
         objs = {'ProjectionLayer': ProjectionLayer, 
-                'ReflectionPadding2D': ReflectionPadding2D}
+                'ReflectionPadding2D': ReflectionPadding2D,
+                'InverseDepthNormalization': InverseDepthNormalization}
+
         with open(self.args.model_file, 'r') as read_file:
             model_architecture_json = json.load(read_file)
             self.test_model = model_from_json(model_architecture_json,
@@ -73,10 +75,17 @@ class ModelTests:
         for i in range(n_tests):
             print('[-] Test [',i+1,'/',n_tests,']',sep='')
 
-            depth_1 = normalize_inverse_depth(results[8][i,:,:,0])
-            depth_2 = normalize_inverse_depth(results[9][i,:,:,0])
-            depth_3 = normalize_inverse_depth(results[10][i,:,:,0])
-            depth_4 = normalize_inverse_depth(results[11][i,:,:,0])
+            depth_1 = self.__normalize_inverse_depth(
+                results[8][i,:,:,0], 0.1, 10)
+            depth_2 = self.__normalize_inverse_depth(
+                np.repeat(np.repeat(results[9][i,:,:,0], 2, axis=0),
+                          2, axis=1), 0.1, 10)
+            depth_3 = self.__normalize_inverse_depth(
+                np.repeat(np.repeat(results[10][i,:,:,0], 4, axis=0),
+                          4, axis=1), 0.1, 10)
+            depth_4 = self.__normalize_inverse_depth(
+                np.repeat(np.repeat(results[11][i,:,:,0], 8, axis=0),
+                          8, axis=1), 0.1, 10)
 
             # Inputs
             plt.figure()
@@ -128,10 +137,17 @@ class ModelTests:
             reprojection_prev_4 = results[6][i]
             reprojection_next_4 = results[7][i]
             
-            depth_1 = normalize_inverse_depth(results[8][i,:,:,0])
-            depth_2 = normalize_inverse_depth(results[9][i,:,:,0])
-            depth_3 = normalize_inverse_depth(results[10][i,:,:,0])
-            depth_4 = normalize_inverse_depth(results[11][i,:,:,0])
+            depth_1 = self.__normalize_inverse_depth(results[8][i,:,:,0],
+                                                     0.1, 10)
+            depth_2 = self.__normalize_inverse_depth(
+                np.repeat(np.repeat(results[9][i,:,:,0], 2, axis=0),
+                          2, axis=1), 0.1, 10)
+            depth_3 = self.__normalize_inverse_depth(
+                np.repeat(np.repeat(results[10][i,:,:,0], 4, axis=0),
+                          4, axis=1), 0.1, 10)
+            depth_4 = self.__normalize_inverse_depth(
+                np.repeat(np.repeat(results[11][i,:,:,0], 8, axis=0),
+                          8, axis=1), 0.1, 10)
 
             # Inputs
             plt.figure()
@@ -229,6 +245,14 @@ class ModelTests:
             next_frame = next_generator.__next__()
 
             yield ([curr_frame, prev_frame, next_frame])
+
+
+    def __normalize_inverse_depth(self, disp, min_depth, max_depth):
+        min_disp = 1 / max_depth
+        max_disp = 1 / min_depth
+        normalized_disp = min_disp + (max_disp - min_disp) * disp
+        depth_map = 1 / normalized_disp
+        return depth_map 
 
 
 
