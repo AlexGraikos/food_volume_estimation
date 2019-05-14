@@ -12,18 +12,18 @@ class Networks:
         self.img_shape = img_shape
 
 
-    def create_generator(self):
+    def create_full_model(self):
         """
-        Creates the generator model.
+        Creates the full monocular depth estimation model.
             Outputs:
-                generator: Generator model.
+                full_model: The created model with all available outputs.
         """
-        # Generator modules
+        # Create modules
         depth_net = self.__create_depth_net()
         pose_net = self.__create_pose_net()
         reprojection_module = self.__create_reprojection_module()
 
-        # Synthesize generator model
+        # Synthesize model
         curr_frame = Input(shape=self.img_shape)
         prev_frame = Input(shape=self.img_shape)
         next_frame = Input(shape=self.img_shape)
@@ -54,11 +54,12 @@ class Networks:
                                                       next_frame,
                                                       reprojections[6],
                                                       reprojections[7]])]
-        generator = Model(
+        full_model = Model(
             inputs=[curr_frame, prev_frame, next_frame],
-            outputs=(reprojections + inverse_depths + per_scale_reprojections),
-            name='generator')
-        return generator
+            outputs=(reprojections + inverse_depths
+                     + per_scale_reprojections),
+            name='full_model')
+        return full_model
 
 
     def __create_depth_net(self):
@@ -69,7 +70,7 @@ class Networks:
         """
         # ResNet18 encoder
         depth_encoder = ResNet18(input_shape=self.img_shape,
-                                 weights='imagenet', include_top=False)
+                                 weights=None, include_top=False)
         skip1 = depth_encoder.get_layer('relu0').output
         skip2 = depth_encoder.get_layer('stage2_unit1_relu1').output
         skip3 = depth_encoder.get_layer('stage3_unit1_relu1').output
@@ -123,17 +124,19 @@ class Networks:
                 pose_net: Pose estimation network model.
         """
         # Pose encoder
-        pose_encoder = ResNet18(input_shape=self.img_shape,
-                                weights='imagenet', include_top=False)
+        pose_encoder = ResNet18(input_shape=(self.img_shape[0],
+                                             self.img_shape[1],
+                                             6),
+                                weights=None, include_top=False)
         # Inputs
         source_frame = Input(shape=self.img_shape)
         target_frame = Input(shape=self.img_shape)
         concatenated_frames = Concatenate()([source_frame, target_frame])
         # Pose net
-        input_pre = ReflectionPadding2D(padding=(1,1))(concatenated_frames)
-        input_pre = Conv2D(filters=3, kernel_size=3,
-                           activation='relu')(input_pre)
-        pose_features = pose_encoder(input_pre)
+        #input_pre = ReflectionPadding2D(padding=(1,1))(concatenated_frames)
+        #input_pre = Conv2D(filters=3, kernel_size=3,
+        #                  activation='relu')(input_pre)
+        pose_features = pose_encoder(concatenated_frames)
         pconv0 = Conv2D(filters=256, kernel_size=1, padding='same',
                         activation='relu')(pose_features)
         pconv1 = Conv2D(filters=256, kernel_size=3, padding='same',
@@ -202,17 +205,5 @@ class Networks:
                                     outputs=reprojections,
                                     name='reprojection_module')
         return reprojection_module
-
-
-    def create_discriminator(self):
-        """
-        Creates the discriminator model.
-            Outputs:
-                discriminator: Discriminator model.
-        """
-        identity_input = Input(shape=self.img_shape)
-        identity_model = Model(inputs=identity_input,
-                                  outputs=Lambda(lambda x: x)(identity_input))
-        return identity_model
 
 

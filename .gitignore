@@ -9,3 +9,6 @@ tests/warping_test/test_images
 
 # Filetypes to NOT ignore
 !*.gitkeep
+
+# Extras
+code/monogan.py

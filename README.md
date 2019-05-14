@@ -3,12 +3,14 @@ This project aims to establish a method for image-based food volume estimation
 using deep learning monocular depth estimation techniques.
 
 ## Todo
-- Decide upon pose network implementation
-- Run tests to verify that everything is working
-- Add discriminator network (pose as conditional input?)
+- Verity network and loss functions w/ tests.
+- Decide upon pose network implementation.
+- Finalize EPIC-Kitchens preprocessing utilities. Network seems to be unable
+  to learn from this dataset due to insufficient camera movement/non-rigid 
+  object movement between frames.
+- NEXT STEP: [GAN] Add discriminator network (pose as conditional input?).
 
 ## Done
-- Created test script for project.py
-- Added smoothness loss
-- Cleaned up code
-- Network seems to be learning depth with lr=10^(-4)
+- Network seems to be learning effectively on KITTI
+- Fixed some issues with losses.
+- Cleaned up code (data utils and tests).

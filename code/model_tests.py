@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import json
 from custom_modules import *
 
+
 class ModelTests:
     def __init__(self):
         """"
@@ -17,7 +18,6 @@ class ModelTests:
         objs = {'ProjectionLayer': ProjectionLayer, 
                 'ReflectionPadding2D': ReflectionPadding2D,
                 'InverseDepthNormalization': InverseDepthNormalization}
-
         with open(self.args.model_file, 'r') as read_file:
             model_architecture_json = json.load(read_file)
             self.test_model = model_from_json(model_architecture_json,
@@ -27,10 +27,9 @@ class ModelTests:
         self.img_shape = self.test_model.inputs[0].shape[1:]
         # Create test data generator
         test_data_df = pd.read_csv(self.args.test_dataframe)
-        self.testDatagen = self.test_datagen(test_data_df, 
-                                             self.img_shape[0], 
-                                             self.img_shape[1],
-                                             self.args.n_tests)
+        self.test_data_gen = self.create_test_data_gen(
+            test_data_df, self.img_shape[0], self.img_shape[1],
+            self.args.n_tests)
 
 
     def parse_args(self):
@@ -41,8 +40,8 @@ class ModelTests:
         """
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='Model testing script.')
-        parser.add_argument('--test_generator', action='store_true',
-                            help='Test all generator outputs.',
+        parser.add_argument('--test_outputs', action='store_true',
+                            help='Test all model outputs.',
                             default=False)
         parser.add_argument('--infer_depth', action='store_true',
                             help='Infer depth from input images.',
@@ -70,142 +69,87 @@ class ModelTests:
                 n_tests: Number of tests to perform.
         """
         # Predict outputs 
-        test_data = self.testDatagen.__next__()
-        results = self.test_model.predict(test_data)
+        test_data = self.test_data_gen.__next__()
+        outputs = self.test_model.predict(test_data)
         for i in range(n_tests):
-            print('[-] Test [',i+1,'/',n_tests,']',sep='')
-
-            depth_1 = self.__normalize_inverse_depth(
-                results[8][i,:,:,0], 0.1, 10)
-            depth_2 = self.__normalize_inverse_depth(
-                np.repeat(np.repeat(results[9][i,:,:,0], 2, axis=0),
-                          2, axis=1), 0.1, 10)
-            depth_3 = self.__normalize_inverse_depth(
-                np.repeat(np.repeat(results[10][i,:,:,0], 4, axis=0),
-                          4, axis=1), 0.1, 10)
-            depth_4 = self.__normalize_inverse_depth(
-                np.repeat(np.repeat(results[11][i,:,:,0], 8, axis=0),
-                          8, axis=1), 0.1, 10)
+            print('[-] Test Input [',i+1,'/',n_tests,']',sep='')
 
             # Inputs
-            plt.figure()
-            plt.subplot(131)
-            plt.title('Previous frame')
-            plt.imshow(test_data[1][i])
-            plt.subplot(132)
-            plt.title('Current frame')
-            plt.imshow(test_data[0][i])
-            plt.subplot(133)
-            plt.title('Next frame')
-            plt.imshow(test_data[2][i])
+            inputs = [test_data[1][i], test_data[0][i], test_data[2][i]]
+            input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
+            self.__pretty_plotting(inputs, (1,3), input_titles)
 
             # Inverse depths
-            plt.figure()
-            plt.subplot(221)
-            plt.title('Inferred depth (Scale 1)')
-            plt.imshow(depth_1)
-            plt.subplot(222)
-            plt.title('Inferred depth (Scale 2)')
-            plt.imshow(depth_2)
-            plt.subplot(223)
-            plt.title('Inferred depth (Scale 3)')
-            plt.imshow(depth_3)
-            plt.subplot(224)
-            plt.title('Inferred depth (Scale 4)')
-            plt.imshow(depth_4)
+            depth_1 = self.__normalize_inverse_depth(
+                outputs[8][i,:,:,0], 0.1, 10)
+            depth_2 = self.__normalize_inverse_depth(
+                outputs[9][i,:,:,0], 0.1, 10, upsample=2)
+            depth_3 = self.__normalize_inverse_depth(
+                outputs[10][i,:,:,0], 0.1, 10, upsample=4)
+            depth_4 = self.__normalize_inverse_depth(
+                outputs[11][i,:,:,0], 0.1, 10, upsample=8)
+            depths = [depth_1, depth_2, depth_3, depth_4]
+            depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
+                            'Inferred Depth (S3)', 'Inferred Depth (S4)']
+            self.__pretty_plotting(depths, (2,2), depth_titles)
             plt.show()
 
 
-    def test_generator(self, n_tests):
+    def test_outputs(self, n_tests):
         """
-        Plots outputs of generator on input image.
+        Plots outputs of model on input images.
             Inputs:
                 n_tests: Number of tests to perform.
         """
         # Infer depth
-        test_data = self.testDatagen.__next__()
-        results = self.test_model.predict(test_data)
+        test_data = self.test_data_gen.__next__()
+        outputs = self.test_model.predict(test_data)
         for i in range(n_tests):
-            print('[-] Test [',i+1,'/',n_tests,']',sep='')
-
-            reprojection_prev_1 = results[0][i]
-            reprojection_next_1 = results[1][i]
-            reprojection_prev_2 = results[2][i]
-            reprojection_next_2 = results[3][i]
-            reprojection_prev_3 = results[4][i]
-            reprojection_next_3 = results[5][i]
-            reprojection_prev_4 = results[6][i]
-            reprojection_next_4 = results[7][i]
-            
-            depth_1 = self.__normalize_inverse_depth(results[8][i,:,:,0],
-                                                     0.1, 10)
-            depth_2 = self.__normalize_inverse_depth(
-                np.repeat(np.repeat(results[9][i,:,:,0], 2, axis=0),
-                          2, axis=1), 0.1, 10)
-            depth_3 = self.__normalize_inverse_depth(
-                np.repeat(np.repeat(results[10][i,:,:,0], 4, axis=0),
-                          4, axis=1), 0.1, 10)
-            depth_4 = self.__normalize_inverse_depth(
-                np.repeat(np.repeat(results[11][i,:,:,0], 8, axis=0),
-                          8, axis=1), 0.1, 10)
+            print('[-] Test Input [',i+1,'/',n_tests,']',sep='')
 
             # Inputs
-            plt.figure()
-            plt.subplot(131)
-            plt.title('Previous frame')
-            plt.imshow(test_data[1][i])
-            plt.subplot(132)
-            plt.title('Current frame')
-            plt.imshow(test_data[0][i])
-            plt.subplot(133)
-            plt.title('Next frame')
-            plt.imshow(test_data[2][i])
+            inputs = [test_data[1][i], test_data[0][i], test_data[2][i]]
+            input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
+            self.__pretty_plotting(inputs, (1,3), input_titles)
 
             # Reprojections
-            plt.figure()
-            plt.subplot(421)
-            plt.title('Reprojection Prev (Scale 1)')
-            plt.imshow(reprojection_prev_1)
-            plt.subplot(422)
-            plt.title('Reprojection Next (Scale 1)')
-            plt.imshow(reprojection_next_1)
-            plt.subplot(423)
-            plt.title('Reprojection Prev (Scale 2)')
-            plt.imshow(reprojection_prev_2)
-            plt.subplot(424)
-            plt.title('Reprojection Next (Scale 2)')
-            plt.imshow(reprojection_next_2)
-            plt.subplot(425)
-            plt.title('Reprojection Prev (Scale 3)')
-            plt.imshow(reprojection_prev_3)
-            plt.subplot(426)
-            plt.title('Reprojection Next (Scale 3)')
-            plt.imshow(reprojection_next_3)
-            plt.subplot(427)
-            plt.title('Reprojection Prev (Scale 4)')
-            plt.imshow(reprojection_prev_4)
-            plt.subplot(428)
-            plt.title('Reprojection Next (Scale 4)')
-            plt.imshow(reprojection_next_4)
+            reprojection_prev_1 = outputs[0][i]
+            reprojection_next_1 = outputs[1][i]
+            reprojection_prev_2 = outputs[2][i]
+            reprojection_next_2 = outputs[3][i]
+            reprojection_prev_3 = outputs[4][i]
+            reprojection_next_3 = outputs[5][i]
+            reprojection_prev_4 = outputs[6][i]
+            reprojection_next_4 = outputs[7][i]
+
+            reprojections = [reprojection_prev_1, reprojection_next_1,
+                             reprojection_prev_2, reprojection_next_2,
+                             reprojection_prev_3, reprojection_next_3,
+                             reprojection_prev_4, reprojection_next_4]
+            reprojection_titles = [
+                'Reprojection Prev. (S1)', 'Reprojection Next (S1)',
+                'Reprojection Prev. (S2)', 'Reprojection Next (S2)',
+                'Reprojection Prev. (S3)', 'Reprojection Next (S3)',
+                'Reprojection Prev. (S4)', 'Reprojection Next (S4)']
+            self.__pretty_plotting(reprojections, (4,2), reprojection_titles)
 
             # Inverse depths
-            plt.figure()
-            plt.subplot(221)
-            plt.title('Inferred depth (Scale 1)')
-            plt.imshow(depth_1)
-            plt.subplot(222)
-            plt.title('Inferred depth (Scale 2)')
-            plt.imshow(depth_2)
-            plt.subplot(223)
-            plt.title('Inferred depth (Scale 3)')
-            plt.imshow(depth_3)
-            plt.subplot(224)
-            plt.title('Inferred depth (Scale 4)')
-            plt.imshow(depth_4)
+            depth_1 = self.__normalize_inverse_depth(
+                outputs[8][i,:,:,0], 0.1, 10)
+            depth_2 = self.__normalize_inverse_depth(
+                outputs[9][i,:,:,0], 0.1, 10, upsample=2)
+            depth_3 = self.__normalize_inverse_depth(
+                outputs[10][i,:,:,0], 0.1, 10, upsample=4)
+            depth_4 = self.__normalize_inverse_depth(
+                outputs[11][i,:,:,0], 0.1, 10, upsample=8)
+            depths = [depth_1, depth_2, depth_3, depth_4]
+            depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
+                            'Inferred Depth (S3)', 'Inferred Depth (S4)']
+            self.__pretty_plotting(depths, (2,2), depth_titles)
             plt.show()
 
 
-    def test_datagen(self, test_data_df, height, width, n_tests):
+    def create_test_data_gen(self, test_data_df, height, width, n_tests):
         """
         Creates test data generator for the model tests.
             Inputs:
@@ -247,7 +191,22 @@ class ModelTests:
             yield ([curr_frame, prev_frame, next_frame])
 
 
-    def __normalize_inverse_depth(self, disp, min_depth, max_depth):
+    def __normalize_inverse_depth(self, disp, min_depth, max_depth, 
+            upsample=1):
+        """
+        Upsamples input disparity map and returns normalized depth with 
+        given min and max values.
+            Inputs:
+                disp: Input disparity map
+                min_depth: Minimum depth value.
+                max_depth: Maximum depth value.
+                upsample: Upsampling rate.
+            Outputs:
+                depth_map: Produced depth map.
+        """
+        if upsample > 1:
+            disp = np.repeat(np.repeat(disp, upsample, axis=0),
+                             upsample, axis=1)
         min_disp = 1 / max_depth
         max_disp = 1 / min_depth
         normalized_disp = min_disp + (max_disp - min_disp) * disp
@@ -255,12 +214,30 @@ class ModelTests:
         return depth_map 
 
 
+    def __pretty_plotting(self, imgs, tiling, titles):
+        """
+        Plots images in a pretty fashion.
+            Inputs:
+                imgs: List of images to plot.
+                tiling: Subplot tiling tuple (rows,cols).
+                titles: List of subplot titles.
+        """
+        n_plots = len(imgs)
+        rows = str(tiling[0])
+        cols = str(tiling[1])
+        plt.figure()
+        for r in range(tiling[0] * tiling[1]):
+            plt.subplot(rows + cols + str(r + 1))
+            plt.title(titles[r])
+            plt.imshow(imgs[r])
+
+
 
 if __name__ == '__main__':
     model_tests = ModelTests()
 
-    if model_tests.args.test_generator == True:
-        model_tests.test_generator(model_tests.args.n_tests)
+    if model_tests.args.test_outputs == True:
+        model_tests.test_outputs(model_tests.args.n_tests)
     elif model_tests.args.infer_depth== True:
         model_tests.infer_depth(model_tests.args.n_tests)
     else:

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import cv2
 
+
 class DataUtils():
     def __init__(self):
         self.args = self.parse_args()
@@ -18,8 +19,9 @@ class DataUtils():
         # Parse command line arguments
         parser = argparse.ArgumentParser(
             description='Data processing utilities.')
-        parser.add_argument('--create_set', action='store_true',
-                            help='Create image set from sources.',
+        parser.add_argument('--create_EPIC_set', action='store_true',
+                            help=('Create image set from '
+                                  + 'EPIC-kitchens dataset sources.'),
                             default=False)
         parser.add_argument('--create_set_df', action='store_true',
                             help='Create sequence dataFrame from sources.',
@@ -31,8 +33,8 @@ class DataUtils():
                             help='File/Directory containing the source data.',
                             default=None)
         parser.add_argument('--save_target', type=str, 
-                            help='Target directory/file to save created \
-                                  set/dataFrame.',
+                            help=('Target directory/file to save created '
+                                  + 'set/dataFrame.'),
                             default=None)
         parser.add_argument('--target_width', type=int,
                             help='Target image width.', 
@@ -41,8 +43,8 @@ class DataUtils():
                             help='Target image height.', 
                             default=128)
         parser.add_argument('--interp', type=str,
-                            help='Interpolation method \
-                                  [nearest/bilinear/cubic].',
+                            help=('Interpolation method '
+                                  + '[nearest/bilinear/cubic].'),
                             default='nearest')
         parser.add_argument('--stride', type=int, 
                             help='Frame triplet creation stride.', 
@@ -136,19 +138,19 @@ class DataUtils():
         return sequence_df
 
 
-    def create_set(self, data_source_file, target_dir, target_size, stride,
-            interpolation):
+    def create_EPIC_set(self, data_source_file, target_dir, target_size,
+            stride, interpolation):
         """
-        Creates a set of images from source directories defined 
-        in data_source_file.
-        Set is filtered with the proposed optical flow preprocessing method.
+        Creates a set of EPIC-kitchens dataset images from source
+        directories defined in data_source_file.
+        The set is filtered by ignoring images with mean optical flow < 1.
         The set is saved at target_dir with target_size image sizes.
             Inputs:
                 data_source_file: File defining image directories 
                                   that compose the target set.
                 target_dir: The target directory to save the set.
                 target_size: Target image size.
-                stride: Frame loading stride.
+                stride: Frame loading stride. For EPIC-kitchens the default=2.
                 interpolation: Interpolation method.
                                [nearest (default)/bilinear/cubic]
         """
@@ -232,7 +234,7 @@ class DataUtils():
                     continue
 
                 # Compose target file name and save resized image
-                prefix = 'source_' + str(source_index)
+                prefix = 'source_' + str(source_index) + '_'
                 target_file_path = os.path.join(target_dir,
                                                 prefix + frame_name_rgb)
                 # If none provided, use input image shape
@@ -256,21 +258,20 @@ class DataUtils():
 if __name__ == '__main__':
     imgUtils = DataUtils()
 
-    if imgUtils.args.create_set == True:
-        imgUtils.create_set(imgUtils.args.data_source,
-                           imgUtils.args.save_target,
-                           target_size=(imgUtils.args.target_height,
-                                        imgUtils.args.target_width),
-                           stride=imgUtils.args.stride,
-                           interpolation=imgUtils.args.interp)
+    if imgUtils.args.create_EPIC_set == True:
+        imgUtils.create_EPIC_set(
+            imgUtils.args.data_source, imgUtils.args.save_target,
+            target_size=(imgUtils.args.target_height,
+                         imgUtils.args.target_width),
+            stride=imgUtils.args.stride, interpolation=imgUtils.args.interp)
     elif imgUtils.args.create_set_df == True:
-        imgUtils.create_set_dataframe(imgUtils.args.data_source,
-                                      imgUtils.args.save_target,
-                                      stride=imgUtils.args.stride)
+        imgUtils.create_set_dataframe(
+            imgUtils.args.data_source, imgUtils.args.save_target,
+            stride=imgUtils.args.stride)
     elif imgUtils.args.create_dir_df == True:
-        imgUtils.create_directory_dataframe(imgUtils.args.data_source,
-                                            imgUtils.args.save_target,
-                                            imgUtils.args.stride)
+        imgUtils.create_directory_dataframe(
+            imgUtils.args.data_source, imgUtils.args.save_target,
+            imgUtils.args.stride)
     else:
         print('[!] Unknown operation, use -h flag for help.')
 

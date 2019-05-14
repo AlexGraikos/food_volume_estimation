@@ -2,6 +2,8 @@ import tensorflow as tf
 import keras.backend as K
 from keras.layers import Layer
 from project import *
+import json
+
 
 class ProjectionLayer(Layer):
     """
@@ -102,7 +104,6 @@ class InverseDepthNormalization(Layer):
 
 
 class Losses():
-
     def reprojection_loss(self, alpha=0.85, masking=True):
         """
         Creates reprojection loss function combining MAE and SSIM losses.
@@ -131,24 +132,25 @@ class Losses():
             reprojection_next_ssim = self.__ssim(y_true, reprojection_next)
             scale_min_ssim = K.minimum(reprojection_prev_ssim,
                                        reprojection_next_ssim)
-            # Source frame MAE
-            prev_mae = K.mean(K.abs(y_true - prev_frame), axis=-1,
-                              keepdims=True)
-            next_mae = K.mean(K.abs(y_true - next_frame), axis=-1,
-                              keepdims=True)
-            source_min_mae  = K.minimum(prev_mae, next_mae)
-            # Source frame SSIM
-            prev_ssim = self.__ssim(y_true, prev_frame)
-            next_ssim = self.__ssim(y_true, next_frame)
-            source_min_ssim = K.minimum(prev_ssim, next_ssim)
+            # Total loss
+            reprojection_loss = (alpha * scale_min_ssim 
+                                 + (1 - alpha) * scale_min_mae)
 
-            # Compute and apply mask to reprojection loss
-            reprojection_loss = (alpha * K.mean(scale_min_ssim) 
-                                 + (1 - alpha) * K.mean(scale_min_mae))
-            source_loss = (alpha * K.mean(source_min_ssim)
-                           + (1 - alpha) * K.mean(source_min_mae))
-            mask = K.less(reprojection_loss, source_loss)
             if masking:
+                # Source frame MAE
+                prev_mae = K.mean(K.abs(y_true - prev_frame), axis=-1,
+                                  keepdims=True)
+                next_mae = K.mean(K.abs(y_true - next_frame), axis=-1,
+                                  keepdims=True)
+                source_min_mae  = K.minimum(prev_mae, next_mae)
+                # Source frame SSIM
+                prev_ssim = self.__ssim(y_true, prev_frame)
+                next_ssim = self.__ssim(y_true, next_frame)
+                source_min_ssim = K.minimum(prev_ssim, next_ssim)
+
+                source_loss = (alpha * source_min_ssim
+                               + (1 - alpha) * source_min_mae)
+                mask = K.less(reprojection_loss, source_loss)
                 reprojection_loss *= K.cast(mask, 'float32')
 
             return reprojection_loss
@@ -166,18 +168,21 @@ class Losses():
         def depth_smoothness_keras(y_true, y_pred):
             img = y_true
             # Normalize inverse depth by mean
-            inverse_depth = y_pred / (tf.reduce_mean(y_pred) + 1e-6)
+            inverse_depth = y_pred / (tf.reduce_mean(y_pred, axis=[1,2,3], 
+                                      keepdims=True) + 1e-7)
             # Compute depth smoothness loss
             inverse_depth_dx = self.__gradient_x(inverse_depth)
             inverse_depth_dy = self.__gradient_y(inverse_depth)
             image_dx = self.__gradient_x(img)
             image_dy = self.__gradient_y(img)
-            weights_x = tf.exp(-tf.reduce_mean(tf.abs(image_dx), 3, keepdims=True))
-            weights_y = tf.exp(-tf.reduce_mean(tf.abs(image_dy), 3, keepdims=True))
+            weights_x = tf.exp(-tf.reduce_mean(tf.abs(image_dx), 3, 
+                                               keepdims=True))
+            weights_y = tf.exp(-tf.reduce_mean(tf.abs(image_dy), 3,
+                                               keepdims=True))
             smoothness_x = inverse_depth_dx * weights_x
             smoothness_y = inverse_depth_dy * weights_y
-            return (tf.reduce_mean(abs(smoothness_x)) 
-                    + tf.reduce_mean(abs(smoothness_y)))
+            return (tf.reduce_mean(tf.abs(smoothness_x)) 
+                    + tf.reduce_mean(tf.abs(smoothness_y)))
 
         return depth_smoothness_keras
 
@@ -191,6 +196,9 @@ class Losses():
         """
         c1 = 0.01**2  # As defined in SSIM to stabilize div. by small denom.
         c2 = 0.03**2
+        # Add padding to maintain img size
+        x = tf.pad(x, [[0,0], [1,1], [1,1], [0,0]], 'REFLECT')
+        y = tf.pad(y, [[0,0], [1,1], [1,1], [0,0]], 'REFLECT')
         mu_x = K.pool2d(x, (3,3), (1,1), 'valid', pool_mode='avg')
         mu_y = K.pool2d(y, (3,3), (1,1), 'valid', pool_mode='avg')
         sigma_x = (K.pool2d(x**2, (3,3), (1,1), 'valid', pool_mode='avg')
@@ -213,3 +221,18 @@ class Losses():
         return img[:, :-1, :, :] - img[:, 1:, :, :]
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """
+    JSON encoder for numpy types.
+    """
+    def default(self, obj):
+        if isinstance(obj, (np.int_, np.intc, np.intp, np.int8,
+                            np.int16, np.int32, np.int64, np.uint8,
+                            np.uint16, np.uint32, np.uint64)):
+            return int(obj)
+        elif isinstance(obj, (np.float_, np.float16, np.float32, 
+                              np.float64)):
+            return float(obj)
+        elif isinstance(obj,(np.ndarray,)):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
