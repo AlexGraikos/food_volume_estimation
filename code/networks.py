@@ -70,7 +70,7 @@ class Networks:
         """
         # ResNet18 encoder
         depth_encoder = ResNet18(input_shape=self.img_shape,
-                                 weights=None, include_top=False)
+                                 weights='imagenet', include_top=False)
         skip1 = depth_encoder.get_layer('relu0').output
         skip2 = depth_encoder.get_layer('stage2_unit1_relu1').output
         skip3 = depth_encoder.get_layer('stage3_unit1_relu1').output
@@ -125,17 +125,34 @@ class Networks:
         """
         # Pose encoder
         pose_encoder = ResNet18(input_shape=(self.img_shape[0],
-                                             self.img_shape[1],
-                                             6),
+                                             self.img_shape[1], 6),
                                 weights=None, include_top=False)
+
+        # Copy pre-trained ResNet18 weights to 6-channel pose encoder
+        pose_encoder_weights_source = ResNet18(
+            input_shape=self.img_shape, weights='imagenet', include_top=False)
+        weights = [l.get_weights() 
+                   for l in pose_encoder_weights_source.layers]
+        for i in range(1, len(pose_encoder.layers)):
+            if i == 1:
+                # Tile batchnorm weights and copy
+                bn_weights = list(map(lambda x: np.tile(x, 2), weights[i]))
+                pose_encoder.layers[i].set_weights(bn_weights)
+            elif i == 3:
+                # Tile conv weights along channel axis and copy
+                conv_weights = list(map(lambda x: np.tile(x, (1, 1, 2, 1)),
+                                    weights[i]))
+                pose_encoder.layers[i].set_weights(conv_weights)
+            else:
+                # Rest of weights match between the two models
+                layer_weights = weights[i]
+                pose_encoder.layers[i].set_weights(layer_weights)
+        
         # Inputs
         source_frame = Input(shape=self.img_shape)
         target_frame = Input(shape=self.img_shape)
         concatenated_frames = Concatenate()([source_frame, target_frame])
         # Pose net
-        #input_pre = ReflectionPadding2D(padding=(1,1))(concatenated_frames)
-        #input_pre = Conv2D(filters=3, kernel_size=3,
-        #                  activation='relu')(input_pre)
         pose_features = pose_encoder(concatenated_frames)
         pconv0 = Conv2D(filters=256, kernel_size=1, padding='same',
                         activation='relu')(pose_features)

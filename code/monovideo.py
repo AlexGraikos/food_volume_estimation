@@ -116,8 +116,7 @@ class MonovideoModel:
         # Train model
         training_history = self.training_model.fit_generator(
             training_data_gen, steps_per_epoch=steps_per_epoch,
-            epochs=training_epochs, verbose=1, use_multiprocessing=True,
-            callbacks=callbacks_list)
+            epochs=training_epochs, verbose=1, callbacks=callbacks_list)
 
         # Save final weights and training history
         model.save_model(self.monovideo, self.model_name, 'weights', '_final')
@@ -218,6 +217,17 @@ class MonovideoModel:
         return halve_lr
 
 
+    def __augment_input(self, x):
+        """
+        Performs data augmentation on input image.
+            Inputs:
+                x: Input image.
+            Outputs:
+                y: Augmented output.
+        """
+        return x
+
+
     def create_training_data_gen(self, training_data_df, height, width,
             batch_size):
         """
@@ -233,8 +243,8 @@ class MonovideoModel:
         # Image preprocessor
         datagen = pre.ImageDataGenerator(
             rescale=1/255,
-            channel_shift_range=0.1,
             horizontal_flip=True,
+            preprocessing_function=self.__augment_input,
             fill_mode='nearest')
 
         # Frame generators - use same seed to ensure continuity

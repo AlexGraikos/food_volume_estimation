@@ -33,8 +33,8 @@ class DataUtils():
                             help='File/Directory containing the source data.',
                             default=None)
         parser.add_argument('--save_target', type=str, 
-                            help=('Target directory/file to save created '
-                                  + 'set/dataFrame.'),
+                            help=('Target directory/file to save created ' +
+                                  'set/dataFrame.'),
                             default=None)
         parser.add_argument('--target_width', type=int,
                             help='Target image width.', 
@@ -43,8 +43,8 @@ class DataUtils():
                             help='Target image height.', 
                             default=128)
         parser.add_argument('--interp', type=str,
-                            help=('Interpolation method '
-                                  + '[nearest/bilinear/cubic].'),
+                            help=('Interpolation method ' +
+                                  '[nearest/bilinear/cubic].'),
                             default='nearest')
         parser.add_argument('--stride', type=int, 
                             help='Frame triplet creation stride.', 

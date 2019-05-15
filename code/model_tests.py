@@ -164,7 +164,6 @@ class ModelTests:
         # Image preprocessor
         datagen = pre.ImageDataGenerator(
             rescale=1/255,
-            channel_shift_range=0.1,
             horizontal_flip=True,
             fill_mode='nearest')
 
