@@ -17,7 +17,8 @@ class ModelTests:
         # Load model architecture with custom model objects
         objs = {'ProjectionLayer': ProjectionLayer, 
                 'ReflectionPadding2D': ReflectionPadding2D,
-                'InverseDepthNormalization': InverseDepthNormalization}
+                'InverseDepthNormalization': InverseDepthNormalization,
+                'AugmentationLayer': AugmentationLayer}
         with open(self.args.model_file, 'r') as read_file:
             model_architecture_json = json.load(read_file)
             self.test_model = model_from_json(model_architecture_json,
@@ -28,8 +29,7 @@ class ModelTests:
         # Create test data generator
         test_data_df = pd.read_csv(self.args.test_dataframe)
         self.test_data_gen = self.create_test_data_gen(
-            test_data_df, self.img_shape[0], self.img_shape[1],
-            self.args.n_tests)
+            test_data_df, self.img_shape[0], self.img_shape[1])
 
 
     def parse_args(self):
@@ -49,15 +49,18 @@ class ModelTests:
         parser.add_argument('--test_dataframe', type=str,
                             help='File containing the test dataFrame.',
                             default=None)
-        parser.add_argument('--n_tests', type=int,
-                            help='Number of tests.',
-                            default=1)
         parser.add_argument('--model_file', type=str,
                             help='Model architecture file (.json).',
                             default=None)
         parser.add_argument('--model_weights', type=str,
                             help='Model weights file (.h5).',
                             default=None)
+        parser.add_argument('--n_tests', type=int,
+                            help='Number of tests.',
+                            default=1)
+        parser.add_argument('--normalize_depth', action='store_true',
+                            help='Normalize depth before displaying.',
+                            default=False)
         args = parser.parse_args()
         return args
  
@@ -69,25 +72,31 @@ class ModelTests:
                 n_tests: Number of tests to perform.
         """
         # Predict outputs 
-        test_data = self.test_data_gen.__next__()
-        outputs = self.test_model.predict(test_data)
         for i in range(n_tests):
             print('[-] Test Input [',i+1,'/',n_tests,']',sep='')
+            test_data = self.test_data_gen.__next__()
+            outputs = self.test_model.predict(test_data)
 
             # Inputs
-            inputs = [test_data[1][i], test_data[0][i], test_data[2][i]]
+            inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
             input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
             self.__pretty_plotting(inputs, (1,3), input_titles)
+            # Augmentations
+            inputs_aug = [outputs[1][0], outputs[0][0], outputs[2][0]]
+            input_aug_titles = ['Previous Frame (Aug.)',
+                                'Current Frame (Aug.)', 
+                                'Next Frame (Aug.)']
+            self.__pretty_plotting(inputs_aug, (1,3), input_aug_titles)
 
             # Inverse depths
             depth_1 = self.__normalize_inverse_depth(
-                outputs[8][i,:,:,0], 0.1, 10)
+                outputs[11][0,:,:,0], 0.1, 10)
             depth_2 = self.__normalize_inverse_depth(
-                outputs[9][i,:,:,0], 0.1, 10, upsample=2)
+                outputs[12][0,:,:,0], 0.1, 10, upsample=2)
             depth_3 = self.__normalize_inverse_depth(
-                outputs[10][i,:,:,0], 0.1, 10, upsample=4)
+                outputs[13][0,:,:,0], 0.1, 10, upsample=4)
             depth_4 = self.__normalize_inverse_depth(
-                outputs[11][i,:,:,0], 0.1, 10, upsample=8)
+                outputs[14][0,:,:,0], 0.1, 10, upsample=8)
             depths = [depth_1, depth_2, depth_3, depth_4]
             depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
                             'Inferred Depth (S3)', 'Inferred Depth (S4)']
@@ -102,25 +111,31 @@ class ModelTests:
                 n_tests: Number of tests to perform.
         """
         # Infer depth
-        test_data = self.test_data_gen.__next__()
-        outputs = self.test_model.predict(test_data)
         for i in range(n_tests):
             print('[-] Test Input [',i+1,'/',n_tests,']',sep='')
+            test_data = self.test_data_gen.__next__()
+            outputs = self.test_model.predict(test_data)
 
             # Inputs
-            inputs = [test_data[1][i], test_data[0][i], test_data[2][i]]
+            inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
             input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
             self.__pretty_plotting(inputs, (1,3), input_titles)
+            # Augmentations
+            inputs_aug = [outputs[1][0], outputs[0][0], outputs[2][0]]
+            input_aug_titles = ['Previous Frame (Aug.)',
+                                'Current Frame (Aug.)', 
+                                'Next Frame (Aug.)']
+            self.__pretty_plotting(inputs_aug, (1,3), input_aug_titles)
 
             # Reprojections
-            reprojection_prev_1 = outputs[0][i]
-            reprojection_next_1 = outputs[1][i]
-            reprojection_prev_2 = outputs[2][i]
-            reprojection_next_2 = outputs[3][i]
-            reprojection_prev_3 = outputs[4][i]
-            reprojection_next_3 = outputs[5][i]
-            reprojection_prev_4 = outputs[6][i]
-            reprojection_next_4 = outputs[7][i]
+            reprojection_prev_1 = outputs[3][0]
+            reprojection_next_1 = outputs[4][0]
+            reprojection_prev_2 = outputs[5][0]
+            reprojection_next_2 = outputs[6][0]
+            reprojection_prev_3 = outputs[7][0]
+            reprojection_next_3 = outputs[8][0]
+            reprojection_prev_4 = outputs[9][0]
+            reprojection_next_4 = outputs[10][0]
 
             reprojections = [reprojection_prev_1, reprojection_next_1,
                              reprojection_prev_2, reprojection_next_2,
@@ -135,13 +150,13 @@ class ModelTests:
 
             # Inverse depths
             depth_1 = self.__normalize_inverse_depth(
-                outputs[8][i,:,:,0], 0.1, 10)
+                outputs[11][0,:,:,0], 0.1, 10)
             depth_2 = self.__normalize_inverse_depth(
-                outputs[9][i,:,:,0], 0.1, 10, upsample=2)
+                outputs[12][0,:,:,0], 0.1, 10, upsample=2)
             depth_3 = self.__normalize_inverse_depth(
-                outputs[10][i,:,:,0], 0.1, 10, upsample=4)
+                outputs[13][0,:,:,0], 0.1, 10, upsample=4)
             depth_4 = self.__normalize_inverse_depth(
-                outputs[11][i,:,:,0], 0.1, 10, upsample=8)
+                outputs[14][0,:,:,0], 0.1, 10, upsample=8)
             depths = [depth_1, depth_2, depth_3, depth_4]
             depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
                             'Inferred Depth (S3)', 'Inferred Depth (S4)']
@@ -149,7 +164,7 @@ class ModelTests:
             plt.show()
 
 
-    def create_test_data_gen(self, test_data_df, height, width, n_tests):
+    def create_test_data_gen(self, test_data_df, height, width):
         """
         Creates test data generator for the model tests.
             Inputs:
@@ -162,24 +177,21 @@ class ModelTests:
                 (inputs) tuple for tests.
         """
         # Image preprocessor
-        datagen = pre.ImageDataGenerator(
-            rescale=1/255,
-            horizontal_flip=True,
-            fill_mode='nearest')
+        datagen = pre.ImageDataGenerator(rescale=1/255, fill_mode='nearest')
 
         # Frame generators - use same seed to ensure continuity
         seed = int(np.random.rand(1,1)*1000)
         curr_generator = datagen.flow_from_dataframe(
             test_data_df, directory=None, x_col='curr_frame',
-            target_size=(height,width), batch_size=n_tests,
+            target_size=(height,width), batch_size=1,
             interpolation='bilinear', class_mode=None, seed=seed)
         prev_generator = datagen.flow_from_dataframe(
             test_data_df, directory=None, x_col='prev_frame',
-            target_size=(height,width), batch_size=n_tests,
+            target_size=(height,width), batch_size=1,
             interpolation='bilinear', class_mode=None, seed=seed)
         next_generator = datagen.flow_from_dataframe(
             test_data_df, directory=None, x_col='next_frame',
-            target_size=(height,width), batch_size=n_tests,
+            target_size=(height,width), batch_size=1,
             interpolation='bilinear', class_mode=None, seed=seed)
     
         while True:
@@ -206,11 +218,14 @@ class ModelTests:
         if upsample > 1:
             disp = np.repeat(np.repeat(disp, upsample, axis=0),
                              upsample, axis=1)
-        min_disp = 1 / max_depth
-        max_disp = 1 / min_depth
-        normalized_disp = min_disp + (max_disp - min_disp) * disp
-        depth_map = 1 / normalized_disp
-        return depth_map 
+        if self.args.normalize_depth:
+            min_disp = 1 / max_depth
+            max_disp = 1 / min_depth
+            normalized_disp = min_disp + (max_disp - min_disp) * disp
+            depth_map = 1 / normalized_disp
+            return depth_map 
+        else:
+            return disp
 
 
     def __pretty_plotting(self, imgs, tiling, titles):

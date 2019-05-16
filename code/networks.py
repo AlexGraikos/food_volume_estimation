@@ -23,20 +23,25 @@ class Networks:
         pose_net = self.__create_pose_net()
         reprojection_module = self.__create_reprojection_module()
 
-        # Synthesize model
+        # Inputs
         curr_frame = Input(shape=self.img_shape)
         prev_frame = Input(shape=self.img_shape)
         next_frame = Input(shape=self.img_shape)
+        # Augmented inputs (not used in reprojection module)
+        augmented_inputs = AugmentationLayer()([curr_frame, prev_frame,
+                                                next_frame])
+        curr_frame_aug, prev_frame_aug, next_frame_aug = augmented_inputs
         # Depth
-        inverse_depths = depth_net(curr_frame)
+        inverse_depths = depth_net(curr_frame_aug)
         # Poses
-        pose_prev = pose_net([prev_frame, curr_frame])
-        pose_next = pose_net([next_frame, curr_frame])
+        pose_prev = pose_net([prev_frame_aug, curr_frame_aug])
+        pose_next = pose_net([next_frame_aug, curr_frame_aug])
         # Reprojections
         reprojections = reprojection_module([prev_frame, next_frame,
                                              pose_prev, pose_next] 
                                             + inverse_depths)
-        # Concatenate reprojections per-scale for computing per scale min loss
+        # Inputs and per-scale reprojections for automasking and 
+        # per-scale min loss
         per_scale_reprojections = [
             Concatenate(name='scale1_reprojections')([prev_frame,
                                                       next_frame, 
@@ -56,7 +61,7 @@ class Networks:
                                                       reprojections[7]])]
         full_model = Model(
             inputs=[curr_frame, prev_frame, next_frame],
-            outputs=(reprojections + inverse_depths
+            outputs=(augmented_inputs + reprojections + inverse_depths
                      + per_scale_reprojections),
             name='full_model')
         return full_model

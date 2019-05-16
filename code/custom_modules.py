@@ -5,6 +5,103 @@ from project import *
 import json
 
 
+class AugmentationLayer(Layer):
+    """
+    Image batch augmentation layer. Random color augmentations are applied to
+    input images during training, with given probability.
+    Augmentation seeds are created to perform the same transformations
+    to all three input frames for consistency.
+    """
+    def __init__(self, augment_prob=0.5, brightness_range=0.2,
+            contrast_range=0.2, saturation_range=0.2, hue_range=0.1,
+            **kwargs):
+        self.augment_prob = augment_prob
+        self.brightness_range = brightness_range
+        self.contrast_range = contrast_range
+        self.saturation_range = saturation_range
+        self.hue_range = hue_range
+        super(AugmentationLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.augment_prob_tensor = tf.constant(self.augment_prob)
+        super(AugmentationLayer, self).build(input_shape)
+
+    def call(self, x):
+        def transform():
+            # Apply transformations with given probability
+            p = tf.random.uniform([], 0.0, 1.0)
+            x_transformed = tf.cond(tf.math.less(p, self.augment_prob_tensor),
+                                    lambda: self.__augment_inputs(x),
+                                    lambda: x)
+            return x_transformed
+
+        # Do not apply augmentations during testing
+        y = tf.cond(K.learning_phase(), lambda: transform(), lambda: x)
+        return y
+        
+
+    def __augment_inputs(self, x):
+        # Unpack inputs
+        curr_frame = x[0]
+        prev_frame = x[1]
+        next_frame = x[2]
+
+        # Brightness
+        brightness_seed = int(np.random.rand() * 1e6)
+        curr_frame = tf.image.random_brightness(
+            curr_frame, self.brightness_range, seed=brightness_seed)
+        prev_frame = tf.image.random_brightness(
+            prev_frame, self.brightness_range, seed=brightness_seed)
+        next_frame = tf.image.random_brightness(
+            next_frame, self.brightness_range, seed=brightness_seed)
+        # Contrast
+        contrast_seed = int(np.random.rand() * 1e6)
+        curr_frame = tf.image.random_contrast(
+            curr_frame, 1 - self.contrast_range, 1 + self.contrast_range,
+            seed=contrast_seed)
+        prev_frame = tf.image.random_contrast(
+            prev_frame, 1 - self.contrast_range, 1 + self.contrast_range,
+            seed=contrast_seed)
+        next_frame = tf.image.random_contrast(
+            next_frame, 1 - self.contrast_range, 1 + self.contrast_range,
+            seed=contrast_seed)
+        # Saturation
+        saturation_seed = int(np.random.rand() * 1e6)
+        curr_frame = tf.image.random_saturation(
+            curr_frame, 1 - self.saturation_range,
+            1 + self.saturation_range, seed=saturation_seed)
+        prev_frame = tf.image.random_saturation(
+            prev_frame, 1 - self.saturation_range,
+            1 + self.saturation_range, seed=saturation_seed)
+        next_frame = tf.image.random_saturation(
+            next_frame, 1 - self.saturation_range,
+            1 + self.saturation_range, seed=saturation_seed)
+        # Hue
+        hue_seed = int(np.random.rand() * 1e6)
+        curr_frame = tf.image.random_hue(curr_frame, self.hue_range,
+                                         seed=hue_seed)
+        prev_frame = tf.image.random_hue(prev_frame, self.hue_range,
+                                         seed=hue_seed)
+        next_frame = tf.image.random_hue(next_frame, self.hue_range,
+                                         seed=hue_seed)
+
+        return [curr_frame, prev_frame, next_frame]
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def get_config(self):
+        config = {
+            'augment_prob': self.augment_prob,
+            'brightness_range': self.brightness_range,
+            'contrast_range':  self.contrast_range,
+            'saturation_range': self.saturation_range,
+            'hue_range': self.hue_range
+        }
+        base_config = super(AugmentationLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 class ProjectionLayer(Layer):
     """
     Projective inverse warping layer.

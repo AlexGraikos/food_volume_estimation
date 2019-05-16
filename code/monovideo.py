@@ -69,9 +69,10 @@ class MonovideoModel:
         self.save_model(self.monovideo, self.model_name, 'architecture')
 
         # Synthesize training model
-        reprojections = self.monovideo.outputs[:8]
-        inverse_depths = self.monovideo.outputs[8:12]
-        per_scale_reprojections = self.monovideo.outputs[12:]
+        augmented_inputs = self.monovideo.output[0:3]
+        reprojections = self.monovideo.outputs[3:11]
+        inverse_depths = self.monovideo.outputs[11:15]
+        per_scale_reprojections = self.monovideo.outputs[15:19]
         self.training_model = Model(inputs=self.monovideo.input,
                                     outputs=(per_scale_reprojections
                                              + inverse_depths),
@@ -81,10 +82,10 @@ class MonovideoModel:
         # Compile
         adam_opt = Adam(lr=1e-4)
         custom_losses = Losses()
-        loss_list = ([custom_losses.reprojection_loss() for _ in range(4)] 
-                     + [custom_losses.depth_smoothness() for _ in range(4)])
-        loss_weights = ([1 for _ in range(4)]
-                        + [0.001 for _ in range(4)])
+        loss_list = ([custom_losses.reprojection_loss() for s in range(4)] 
+                     + [custom_losses.depth_smoothness() for s in range(4)])
+        loss_weights = ([1 for s in range(4)]
+                        + [(0.001 / (2 ** s)) for s in range(4)])
         self.training_model.compile(adam_opt, loss=loss_list,
                                  loss_weights=loss_weights)
 
@@ -217,17 +218,6 @@ class MonovideoModel:
         return halve_lr
 
 
-    def __augment_input(self, x):
-        """
-        Performs data augmentation on input image.
-            Inputs:
-                x: Input image.
-            Outputs:
-                y: Augmented output.
-        """
-        return x
-
-
     def create_training_data_gen(self, training_data_df, height, width,
             batch_size):
         """
@@ -240,12 +230,11 @@ class MonovideoModel:
             Outputs:
                 ([inputs], [outputs]) tuple for model training.
         """
-        # Image preprocessor
-        datagen = pre.ImageDataGenerator(
-            rescale=1/255,
-            horizontal_flip=True,
-            preprocessing_function=self.__augment_input,
-            fill_mode='nearest')
+        # Image preprocessor. Horizontal flipping is applied to both
+        # inputs and target outputs
+        datagen = pre.ImageDataGenerator(rescale=1/255,
+                                         horizontal_flip=True,
+                                         fill_mode='nearest')
 
         # Frame generators - use same seed to ensure continuity
         seed = int(np.random.rand(1)*1000)
