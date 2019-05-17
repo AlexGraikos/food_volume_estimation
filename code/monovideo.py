@@ -19,7 +19,6 @@ class MonovideoModel:
         self.args = self.__parse_args()
         # Model parameters
         self.img_shape = (self.args.img_height, self.args.img_width, 3)
-        self.nets = Networks(self.img_shape)
         self.model_name = self.args.model_name
 
 
@@ -63,8 +62,9 @@ class MonovideoModel:
         """
         Initializes model training.
         """
+        nets = Networks(self.img_shape)
         # Create monovideo model
-        self.monovideo = self.nets.create_full_model()
+        self.monovideo = nets.create_full_model()
         print('[*] Created model')
         self.save_model(self.monovideo, self.model_name, 'architecture')
 

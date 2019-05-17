@@ -10,7 +10,7 @@ class AugmentationLayer(Layer):
     Image batch augmentation layer. Random color augmentations are applied to
     input images during training, with given probability.
     Augmentation seeds are created to perform the same transformations
-    to all three input frames for consistency.
+    on all three input frames for consistency.
     """
     def __init__(self, augment_prob=0.5, brightness_range=0.2,
             contrast_range=0.2, saturation_range=0.2, hue_range=0.1,
@@ -39,7 +39,6 @@ class AugmentationLayer(Layer):
         y = tf.cond(K.learning_phase(), lambda: transform(), lambda: x)
         return y
         
-
     def __augment_inputs(self, x):
         # Unpack inputs
         curr_frame = x[0]
@@ -109,7 +108,7 @@ class ProjectionLayer(Layer):
     during training.
     """
     def __init__(self, intrinsics_mat=None, **kwargs):
-        self.POSE_SCALING = 0.01
+        self.pose_scaling = 0.001
         if intrinsics_mat is None:
             self.intrinsics_mat = np.array([[1, 0, 0.5],
                                             [0, 1, 0.5],
@@ -127,7 +126,7 @@ class ProjectionLayer(Layer):
     def call(self, x):
         source_img = x[0]
         depth_map = x[1]
-        pose = x[2] * self.POSE_SCALING
+        pose = x[2] * self.pose_scaling
         reprojected_img, _ = inverse_warp(source_img, depth_map, pose,
                                           self.intrinsics_mat_tensor,
                                           self.intrinsics_mat_inv_tensor)
@@ -159,8 +158,8 @@ class ReflectionPadding2D(Layer):
                       'REFLECT')
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1]+2*self.padding[0],
-                input_shape[2]+2*self.padding[1], input_shape[3])
+        return (input_shape[0], input_shape[1] + (2 * self.padding[0]),
+                input_shape[2] + (2 * self.padding[1]), input_shape[3])
 
     def get_config(self):
         config = {
@@ -175,7 +174,7 @@ class InverseDepthNormalization(Layer):
     Normalizes and inverses disparities to create depth map with
     given max and min values.
     """
-    def __init__(self, min_depth=1, max_depth=100, **kwargs):
+    def __init__(self, min_depth=0.1, max_depth=10, **kwargs):
         self.min_depth = min_depth
         self.max_depth = max_depth
         self.min_disp = 1 / max_depth

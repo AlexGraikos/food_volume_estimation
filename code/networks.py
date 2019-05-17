@@ -133,7 +133,7 @@ class Networks:
                                              self.img_shape[1], 6),
                                 weights=None, include_top=False)
 
-        # Copy pre-trained ResNet18 weights to 6-channel pose encoder
+        # Copy pre-trained ResNet18 weights to 6-channel pose ResNet encoder
         pose_encoder_weights_source = ResNet18(
             input_shape=self.img_shape, weights='imagenet', include_top=False)
         weights = [l.get_weights() 

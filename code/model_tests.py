@@ -81,12 +81,6 @@ class ModelTests:
             inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
             input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
             self.__pretty_plotting(inputs, (1,3), input_titles)
-            # Augmentations
-            inputs_aug = [outputs[1][0], outputs[0][0], outputs[2][0]]
-            input_aug_titles = ['Previous Frame (Aug.)',
-                                'Current Frame (Aug.)', 
-                                'Next Frame (Aug.)']
-            self.__pretty_plotting(inputs_aug, (1,3), input_aug_titles)
 
             # Inverse depths
             depth_1 = self.__normalize_inverse_depth(
@@ -120,12 +114,6 @@ class ModelTests:
             inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
             input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
             self.__pretty_plotting(inputs, (1,3), input_titles)
-            # Augmentations
-            inputs_aug = [outputs[1][0], outputs[0][0], outputs[2][0]]
-            input_aug_titles = ['Previous Frame (Aug.)',
-                                'Current Frame (Aug.)', 
-                                'Next Frame (Aug.)']
-            self.__pretty_plotting(inputs_aug, (1,3), input_aug_titles)
 
             # Reprojections
             reprojection_prev_1 = outputs[3][0]
