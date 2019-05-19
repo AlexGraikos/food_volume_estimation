@@ -108,7 +108,7 @@ class ProjectionLayer(Layer):
     during training.
     """
     def __init__(self, intrinsics_mat=None, **kwargs):
-        self.pose_scaling = 0.001
+        self.POSE_SCALING = 0.01
         if intrinsics_mat is None:
             self.intrinsics_mat = np.array([[1, 0, 0.5],
                                             [0, 1, 0.5],
@@ -126,7 +126,7 @@ class ProjectionLayer(Layer):
     def call(self, x):
         source_img = x[0]
         depth_map = x[1]
-        pose = x[2] * self.pose_scaling
+        pose = x[2] * self.POSE_SCALING
         reprojected_img, _ = inverse_warp(source_img, depth_map, pose,
                                           self.intrinsics_mat_tensor,
                                           self.intrinsics_mat_inv_tensor)
@@ -174,7 +174,7 @@ class InverseDepthNormalization(Layer):
     Normalizes and inverses disparities to create depth map with
     given max and min values.
     """
-    def __init__(self, min_depth=0.1, max_depth=10, **kwargs):
+    def __init__(self, min_depth=0.01, max_depth=10, **kwargs):
         self.min_depth = min_depth
         self.max_depth = max_depth
         self.min_disp = 1 / max_depth

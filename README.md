@@ -10,8 +10,6 @@ using deep learning monocular depth estimation techniques.
 - NEXT STEP: [GAN] Add discriminator network (pose as conditional input?).
 
 ## Done
-- Verified that the training flag is working and augmentations are only
-  applied during the learning phase.
-- Added per-scale weight to smoothness loss.
-- Network seems to be learning effectively on KITTI. 
-  Changing depth min-max values and intrinsics could enhance results.
+- Fixed intrinsics matrix and pose scaling. They seem to be working now.
+- Stride 2 (default) for set creation and stride 10 for frame selection show
+  promising results.

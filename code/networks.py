@@ -194,20 +194,20 @@ class Networks:
                                        self.img_shape[1] // 4, 1))
         inverse_depth_4 = Input(shape=(self.img_shape[0] // 8,
                                        self.img_shape[1] // 8, 1))
-        # Scale intrinsics matrix to image size
+        # Scale intrinsics matrix to image size (in pixel dims)
         x_scaling = self.img_shape[1] / 1920
         y_scaling = self.img_shape[0] / 1080
-        intrinsics_mat = np.array([[1000*x_scaling, 0, 950*x_scaling],
-                                   [0, 1000*y_scaling, 540*y_scaling],
+        intrinsics_mat = np.array([[604.54 * x_scaling, 0, 960 * x_scaling],
+                                   [0, 181.73 * y_scaling, 540 * y_scaling],
                                    [0, 0, 1]])
         # Upsample and normalize inverse depth maps
         inverse_depth_2_up = UpSampling2D(size=(2,2))(inverse_depth_2)
         inverse_depth_3_up = UpSampling2D(size=(4,4))(inverse_depth_3)
         inverse_depth_4_up = UpSampling2D(size=(8,8))(inverse_depth_4)
-        depth_map_1 = InverseDepthNormalization(0.1, 10)(inverse_depth_1)
-        depth_map_2 = InverseDepthNormalization(0.1, 10)(inverse_depth_2_up)
-        depth_map_3 = InverseDepthNormalization(0.1, 10)(inverse_depth_3_up)
-        depth_map_4 = InverseDepthNormalization(0.1, 10)(inverse_depth_4_up)
+        depth_map_1 = InverseDepthNormalization(0.01, 10)(inverse_depth_1)
+        depth_map_2 = InverseDepthNormalization(0.01, 10)(inverse_depth_2_up)
+        depth_map_3 = InverseDepthNormalization(0.01, 10)(inverse_depth_3_up)
+        depth_map_4 = InverseDepthNormalization(0.01, 10)(inverse_depth_4_up)
 
         # Create reprojections for each depth map scale from highest to lowest
         reprojections = []

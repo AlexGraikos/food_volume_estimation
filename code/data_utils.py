@@ -8,6 +8,7 @@ import cv2
 class DataUtils():
     def __init__(self):
         self.args = self.parse_args()
+        self.FLOW_THRESHOLD = 1
 
 
     def parse_args(self):
@@ -229,7 +230,7 @@ class DataUtils():
                 flow_v_scaled = flow_v*(50/255) - 25
                 flow_mean = (np.mean(np.sqrt(np.square(flow_u_scaled)
                              + np.square(flow_v_scaled))))
-                if flow_mean < 1:
+                if flow_mean < self.FLOW_THRESHOLD:
                     rejected_frames += 1
                     continue
 

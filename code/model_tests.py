@@ -84,13 +84,13 @@ class ModelTests:
 
             # Inverse depths
             depth_1 = self.__normalize_inverse_depth(
-                outputs[11][0,:,:,0], 0.1, 10)
+                outputs[11][0,:,:,0], 0.01, 10)
             depth_2 = self.__normalize_inverse_depth(
-                outputs[12][0,:,:,0], 0.1, 10, upsample=2)
+                outputs[12][0,:,:,0], 0.01, 10, upsample=2)
             depth_3 = self.__normalize_inverse_depth(
-                outputs[13][0,:,:,0], 0.1, 10, upsample=4)
+                outputs[13][0,:,:,0], 0.01, 10, upsample=4)
             depth_4 = self.__normalize_inverse_depth(
-                outputs[14][0,:,:,0], 0.1, 10, upsample=8)
+                outputs[14][0,:,:,0], 0.01, 10, upsample=8)
             depths = [depth_1, depth_2, depth_3, depth_4]
             depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
                             'Inferred Depth (S3)', 'Inferred Depth (S4)']
@@ -138,13 +138,13 @@ class ModelTests:
 
             # Inverse depths
             depth_1 = self.__normalize_inverse_depth(
-                outputs[11][0,:,:,0], 0.1, 10)
+                outputs[11][0,:,:,0], 0.01, 10)
             depth_2 = self.__normalize_inverse_depth(
-                outputs[12][0,:,:,0], 0.1, 10, upsample=2)
+                outputs[12][0,:,:,0], 0.01, 10, upsample=2)
             depth_3 = self.__normalize_inverse_depth(
-                outputs[13][0,:,:,0], 0.1, 10, upsample=4)
+                outputs[13][0,:,:,0], 0.01, 10, upsample=4)
             depth_4 = self.__normalize_inverse_depth(
-                outputs[14][0,:,:,0], 0.1, 10, upsample=8)
+                outputs[14][0,:,:,0], 0.01, 10, upsample=8)
             depths = [depth_1, depth_2, depth_3, depth_4]
             depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
                             'Inferred Depth (S3)', 'Inferred Depth (S4)']
