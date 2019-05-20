@@ -20,6 +20,10 @@ class MonovideoModel:
         # Model parameters
         self.img_shape = (self.args.img_height, self.args.img_width, 3)
         self.model_name = self.args.model_name
+        with open(self.args.config, 'r') as read_file:
+            config = json.load(read_file)
+            self.intrinsics_mat = np.array(config['intrinsics'])
+            self.dataset = config['name']
 
 
     def __parse_args(self):
@@ -35,6 +39,9 @@ class MonovideoModel:
                             default=False)
         parser.add_argument('--train_dataframe', type=str, 
                             help='File containing the training dataFrame.',
+                            default=None)
+        parser.add_argument('--config', type=str, 
+                            help='Dataset configuration file (.json).',
                             default=None)
         parser.add_argument('--batch_size', type=int, 
                             help='Training batch size.',
@@ -62,7 +69,7 @@ class MonovideoModel:
         """
         Initializes model training.
         """
-        nets = Networks(self.img_shape)
+        nets = Networks(self.img_shape, self.intrinsics_mat)
         # Create monovideo model
         self.monovideo = nets.create_full_model()
         print('[*] Created model')

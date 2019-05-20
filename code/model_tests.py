@@ -46,6 +46,15 @@ class ModelTests:
         parser.add_argument('--infer_depth', action='store_true',
                             help='Infer depth from input images.',
                             default=False)
+        parser.add_argument('--create_pc', action='store_true',
+                            help='Create point cloud from input image.',
+                            default=False)
+        parser.add_argument('--input_image', type=str,
+                            help='Input image.',
+                            default=None)
+        parser.add_argument('--output_file', type=str,
+                            help='Output file (.csv).',
+                            default=None)
         parser.add_argument('--test_dataframe', type=str,
                             help='File containing the test dataFrame.',
                             default=None)
@@ -64,7 +73,44 @@ class ModelTests:
         args = parser.parse_args()
         return args
  
+    
+    def create_point_cloud(self, img):
+        # TODO: Clean up
+        import project
+        import keras.backend as K
 
+        # Inputs-predictions
+        input_img = pre.img_to_array(pre.load_img(img)) / 255
+        test_data = [np.reshape(input_img, (1,)+input_img.shape),
+                     np.reshape(input_img, (1,)+input_img.shape),
+                     np.reshape(input_img, (1,)+input_img.shape)]
+
+        disp_map = self.test_model.predict(test_data)[11][0,:,:,0]
+        depth = self.__normalize_inverse_depth(disp_map, 0.01, 10)
+        # Intrinsics (EPIC dataset)
+        x_scaling = int(self.img_shape[1]) / 1920
+        y_scaling = int(self.img_shape[0]) / 1080
+        intrinsics = np.array([[604.54*x_scaling, 0, 960*x_scaling],
+                               [0, 181.73*y_scaling, 540*y_scaling],
+                               [0,0 ,1]], dtype=np.float32)
+        intrinsics_inv = np.linalg.inv(intrinsics)
+        # Create tensors
+        depth_tensor = K.variable(np.expand_dims(depth, 0))
+        intrinsics_inv_tensor = K.variable(np.expand_dims(intrinsics_inv, 0))
+        # Get point cloud
+        point_cloud = K.eval(get_cloud(depth_tensor, intrinsics_inv_tensor))
+        point_cloud = np.reshape(point_cloud, point_cloud.shape[1:]) # Ignore batch size
+        point_cloud[:,:,0] *= -1 # Invert x axis
+        point_cloud[:,:,2] *= -1 # Invert z axis
+        point_cloud = np.reshape(point_cloud, (point_cloud.shape[0]*point_cloud.shape[1],3))
+        point_cloud_df = pd.DataFrame(point_cloud, columns=['x','y','z'])
+        point_cloud_df.to_csv(self.args.output_file, index=False)
+        # Plot input and depth images
+        self.__pretty_plotting([input_img, depth], (1,2), 
+                               ['Input Image', 'Depth'])
+        plt.show()
+
+        
     def infer_depth(self, n_tests):
         """
         Infers depth from input image.
@@ -114,6 +160,15 @@ class ModelTests:
             inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
             input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
             self.__pretty_plotting(inputs, (1,3), input_titles)
+
+            # Augmented inputs (if enabled during testing)
+            aug_inputs = [outputs[1][0], outputs[0][0], outputs[2][0]]
+            if np.sum(np.abs(np.concatenate(inputs, axis=-1) 
+                             - np.concatenate(aug_inputs, axis=-1))) > 1e-5:
+                aug_input_titles = ['Previous Frame (Aug.)',
+                                    'Current Frame (Aug.)',
+                                    'Next Frame (Aug.)']
+                self.__pretty_plotting(aug_inputs, (1,3), aug_input_titles)
 
             # Reprojections
             reprojection_prev_1 = outputs[3][0]
@@ -242,6 +297,8 @@ if __name__ == '__main__':
         model_tests.test_outputs(model_tests.args.n_tests)
     elif model_tests.args.infer_depth== True:
         model_tests.infer_depth(model_tests.args.n_tests)
+    elif model_tests.args.create_pc == True:
+        model_tests.create_point_cloud(model_tests.args.input_image)
     else:
         print('[!] Unknown operation, use -h flag for help.')
 

@@ -8,8 +8,14 @@ from custom_modules import *
 
 
 class Networks:
-    def __init__(self, img_shape):
+    def __init__(self, img_shape, intrinsics_matrix):
         self.img_shape = img_shape
+        self.intrinsics_matrix = intrinsics_matrix
+        # Scale intrinsics matrix to image size (in pixel dims)
+        x_scaling = self.img_shape[1] / 1920
+        y_scaling = self.img_shape[0] / 1080
+        self.intrinsics_matrix[0, :] *= x_scaling
+        self.intrinsics_matrix[1, :] *= y_scaling
 
 
     def create_full_model(self):
@@ -194,12 +200,6 @@ class Networks:
                                        self.img_shape[1] // 4, 1))
         inverse_depth_4 = Input(shape=(self.img_shape[0] // 8,
                                        self.img_shape[1] // 8, 1))
-        # Scale intrinsics matrix to image size (in pixel dims)
-        x_scaling = self.img_shape[1] / 1920
-        y_scaling = self.img_shape[0] / 1080
-        intrinsics_mat = np.array([[604.54 * x_scaling, 0, 960 * x_scaling],
-                                   [0, 181.73 * y_scaling, 540 * y_scaling],
-                                   [0, 0, 1]])
         # Upsample and normalize inverse depth maps
         inverse_depth_2_up = UpSampling2D(size=(2,2))(inverse_depth_2)
         inverse_depth_3_up = UpSampling2D(size=(4,4))(inverse_depth_3)
@@ -212,12 +212,10 @@ class Networks:
         # Create reprojections for each depth map scale from highest to lowest
         reprojections = []
         for depth_map in [depth_map_1, depth_map_2, depth_map_3, depth_map_4]:
-            prev_to_target = ProjectionLayer(intrinsics_mat)([prev_frame,
-                                                              depth_map,
-                                                              pose_prev])
-            next_to_target = ProjectionLayer(intrinsics_mat)([next_frame,
-                                                              depth_map,
-                                                              pose_next])
+            prev_to_target = ProjectionLayer(
+                self.intrinsics_matrix)([prev_frame, depth_map, pose_prev])
+            next_to_target = ProjectionLayer(
+                self.intrinsics_matrix)([next_frame, depth_map, pose_next])
             reprojections += [prev_to_target, next_to_target]
 
         reprojection_module = Model(inputs=[prev_frame, next_frame,
