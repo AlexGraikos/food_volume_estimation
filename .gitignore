@@ -3,6 +3,8 @@ code/trained_models/*
 datasets/*
 sources/*
 tests/warping_test/test_images
+tests/point_cloud/.ipynb_checkpoints/*
+tests/point_cloud/pyntcloud_plot_assets/*
 
 # Filetypes to ignore
 *.pyc
@@ -14,3 +16,4 @@ tests/warping_test/test_images
 
 # Extras
 code/monogan.py
+tests/point_cloud/plotVG.html
