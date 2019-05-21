@@ -6,6 +6,8 @@ tests/warping_test/test_images
 
 # Filetypes to ignore
 *.pyc
+*.png
+*.jpg
 
 # Filetypes to NOT ignore
 !*.gitkeep
