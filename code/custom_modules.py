@@ -108,13 +108,8 @@ class ProjectionLayer(Layer):
     during training.
     """
     def __init__(self, intrinsics_mat=None, **kwargs):
-        self.POSE_SCALING = 0.01
-        if intrinsics_mat is None:
-            self.intrinsics_mat = np.array([[1, 0, 0.5],
-                                            [0, 1, 0.5],
-                                            [0, 0,   1]])
-        else:
-            self.intrinsics_mat = intrinsics_mat
+        self.POSE_SCALING = 0.001
+        self.intrinsics_mat = intrinsics_mat
         self.intrinsics_mat_inv = np.linalg.inv(self.intrinsics_mat)
         super(ProjectionLayer, self).__init__(**kwargs)
 

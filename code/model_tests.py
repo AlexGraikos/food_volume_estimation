@@ -43,18 +43,6 @@ class ModelTests:
         parser.add_argument('--test_outputs', action='store_true',
                             help='Test all model outputs.',
                             default=False)
-        parser.add_argument('--infer_depth', action='store_true',
-                            help='Infer depth from input images.',
-                            default=False)
-        parser.add_argument('--create_pc', action='store_true',
-                            help='Create point cloud from input image.',
-                            default=False)
-        parser.add_argument('--input_image', type=str,
-                            help='Input image.',
-                            default=None)
-        parser.add_argument('--output_file', type=str,
-                            help='Output file (.csv).',
-                            default=None)
         parser.add_argument('--test_dataframe', type=str,
                             help='File containing the test dataFrame.',
                             default=None)
@@ -67,82 +55,9 @@ class ModelTests:
         parser.add_argument('--n_tests', type=int,
                             help='Number of tests.',
                             default=1)
-        parser.add_argument('--normalize_depth', action='store_true',
-                            help='Normalize depth before displaying.',
-                            default=False)
         args = parser.parse_args()
         return args
- 
     
-    def create_point_cloud(self, img):
-        # TODO: Clean up
-        import project
-        import keras.backend as K
-
-        # Inputs-predictions
-        input_img = pre.img_to_array(pre.load_img(img)) / 255
-        test_data = [np.reshape(input_img, (1,)+input_img.shape),
-                     np.reshape(input_img, (1,)+input_img.shape),
-                     np.reshape(input_img, (1,)+input_img.shape)]
-
-        disp_map = self.test_model.predict(test_data)[11][0,:,:,0]
-        depth = self.__normalize_inverse_depth(disp_map, 0.01, 10)
-        # Intrinsics (EPIC dataset)
-        x_scaling = int(self.img_shape[1]) / 1920
-        y_scaling = int(self.img_shape[0]) / 1080
-        intrinsics = np.array([[604.54*x_scaling, 0, 960*x_scaling],
-                               [0, 181.73*y_scaling, 540*y_scaling],
-                               [0,0 ,1]], dtype=np.float32)
-        intrinsics_inv = np.linalg.inv(intrinsics)
-        # Create tensors
-        depth_tensor = K.variable(np.expand_dims(depth, 0))
-        intrinsics_inv_tensor = K.variable(np.expand_dims(intrinsics_inv, 0))
-        # Get point cloud
-        point_cloud = K.eval(get_cloud(depth_tensor, intrinsics_inv_tensor))
-        point_cloud = np.reshape(point_cloud, point_cloud.shape[1:]) # Ignore batch size
-        point_cloud[:,:,0] *= -1 # Invert x axis
-        point_cloud[:,:,2] *= -1 # Invert z axis
-        point_cloud = np.reshape(point_cloud, (point_cloud.shape[0]*point_cloud.shape[1],3))
-        point_cloud_df = pd.DataFrame(point_cloud, columns=['x','y','z'])
-        point_cloud_df.to_csv(self.args.output_file, index=False)
-        # Plot input and depth images
-        self.__pretty_plotting([input_img, depth], (1,2), 
-                               ['Input Image', 'Depth'])
-        plt.show()
-
-        
-    def infer_depth(self, n_tests):
-        """
-        Infers depth from input image.
-            Inputs:
-                n_tests: Number of tests to perform.
-        """
-        # Predict outputs 
-        for i in range(n_tests):
-            print('[-] Test Input [',i+1,'/',n_tests,']',sep='')
-            test_data = self.test_data_gen.__next__()
-            outputs = self.test_model.predict(test_data)
-
-            # Inputs
-            inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
-            input_titles = ['Previous Frame', 'Current Frame', 'Next Frame']
-            self.__pretty_plotting(inputs, (1,3), input_titles)
-
-            # Inverse depths
-            depth_1 = self.__normalize_inverse_depth(
-                outputs[11][0,:,:,0], 0.01, 10)
-            depth_2 = self.__normalize_inverse_depth(
-                outputs[12][0,:,:,0], 0.01, 10, upsample=2)
-            depth_3 = self.__normalize_inverse_depth(
-                outputs[13][0,:,:,0], 0.01, 10, upsample=4)
-            depth_4 = self.__normalize_inverse_depth(
-                outputs[14][0,:,:,0], 0.01, 10, upsample=8)
-            depths = [depth_1, depth_2, depth_3, depth_4]
-            depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
-                            'Inferred Depth (S3)', 'Inferred Depth (S4)']
-            self.__pretty_plotting(depths, (2,2), depth_titles)
-            plt.show()
-
 
     def test_outputs(self, n_tests):
         """
@@ -192,14 +107,10 @@ class ModelTests:
             self.__pretty_plotting(reprojections, (4,2), reprojection_titles)
 
             # Inverse depths
-            depth_1 = self.__normalize_inverse_depth(
-                outputs[11][0,:,:,0], 0.01, 10)
-            depth_2 = self.__normalize_inverse_depth(
-                outputs[12][0,:,:,0], 0.01, 10, upsample=2)
-            depth_3 = self.__normalize_inverse_depth(
-                outputs[13][0,:,:,0], 0.01, 10, upsample=4)
-            depth_4 = self.__normalize_inverse_depth(
-                outputs[14][0,:,:,0], 0.01, 10, upsample=8)
+            depth_1 = outputs[19][0,:,:,0]
+            depth_2 = outputs[20][0,:,:,0]
+            depth_3 = outputs[21][0,:,:,0]
+            depth_4 = outputs[22][0,:,:,0]
             depths = [depth_1, depth_2, depth_3, depth_4]
             depth_titles = ['Inferred Depth (S1)', 'Inferred Depth (S2)',
                             'Inferred Depth (S3)', 'Inferred Depth (S4)']
@@ -245,32 +156,6 @@ class ModelTests:
             yield ([curr_frame, prev_frame, next_frame])
 
 
-    def __normalize_inverse_depth(self, disp, min_depth, max_depth, 
-            upsample=1):
-        """
-        Upsamples input disparity map and returns normalized depth with 
-        given min and max values.
-            Inputs:
-                disp: Input disparity map
-                min_depth: Minimum depth value.
-                max_depth: Maximum depth value.
-                upsample: Upsampling rate.
-            Outputs:
-                depth_map: Produced depth map.
-        """
-        if upsample > 1:
-            disp = np.repeat(np.repeat(disp, upsample, axis=0),
-                             upsample, axis=1)
-        if self.args.normalize_depth:
-            min_disp = 1 / max_depth
-            max_disp = 1 / min_depth
-            normalized_disp = min_disp + (max_disp - min_disp) * disp
-            depth_map = 1 / normalized_disp
-            return depth_map 
-        else:
-            return disp
-
-
     def __pretty_plotting(self, imgs, tiling, titles):
         """
         Plots images in a pretty fashion.
@@ -295,8 +180,6 @@ if __name__ == '__main__':
 
     if model_tests.args.test_outputs == True:
         model_tests.test_outputs(model_tests.args.n_tests)
-    elif model_tests.args.infer_depth== True:
-        model_tests.infer_depth(model_tests.args.n_tests)
     elif model_tests.args.create_pc == True:
         model_tests.create_point_cloud(model_tests.args.input_image)
     else:

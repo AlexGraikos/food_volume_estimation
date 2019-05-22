@@ -78,8 +78,9 @@ class MonovideoModel:
         # Synthesize training model
         augmented_inputs = self.monovideo.output[0:3]
         reprojections = self.monovideo.outputs[3:11]
-        inverse_depths = self.monovideo.outputs[11:15]
-        per_scale_reprojections = self.monovideo.outputs[15:19]
+        per_scale_reprojections = self.monovideo.outputs[11:15]
+        inverse_depths = self.monovideo.outputs[15:19]
+        depth_maps = self.monovideo.outputs[19:23]
         self.training_model = Model(inputs=self.monovideo.input,
                                     outputs=(per_scale_reprojections
                                              + inverse_depths),

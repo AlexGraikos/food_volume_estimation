@@ -42,10 +42,11 @@ class Networks:
         # Poses
         pose_prev = pose_net([prev_frame_aug, curr_frame_aug])
         pose_next = pose_net([next_frame_aug, curr_frame_aug])
-        # Reprojections
-        reprojections = reprojection_module([prev_frame, next_frame,
-                                             pose_prev, pose_next] 
-                                            + inverse_depths)
+        # Reprojections and depth maps
+        module_outputs = reprojection_module(
+            [prev_frame, next_frame, pose_prev, pose_next] + inverse_depths)
+        reprojections = module_outputs[:8]
+        depth_maps = module_outputs[8:]
         # Inputs and per-scale reprojections for automasking and 
         # per-scale min loss
         per_scale_reprojections = [
@@ -67,8 +68,9 @@ class Networks:
                                                       reprojections[7]])]
         full_model = Model(
             inputs=[curr_frame, prev_frame, next_frame],
-            outputs=(augmented_inputs + reprojections + inverse_depths
-                     + per_scale_reprojections),
+            outputs=(augmented_inputs
+                     + reprojections + per_scale_reprojections
+                     + inverse_depths + depth_maps),
             name='full_model')
         return full_model
 
@@ -208,21 +210,22 @@ class Networks:
         depth_map_2 = InverseDepthNormalization(0.01, 10)(inverse_depth_2_up)
         depth_map_3 = InverseDepthNormalization(0.01, 10)(inverse_depth_3_up)
         depth_map_4 = InverseDepthNormalization(0.01, 10)(inverse_depth_4_up)
+        depth_maps = [depth_map_1, depth_map_2, depth_map_3, depth_map_4]
 
         # Create reprojections for each depth map scale from highest to lowest
         reprojections = []
-        for depth_map in [depth_map_1, depth_map_2, depth_map_3, depth_map_4]:
+        for depth in depth_maps:
             prev_to_target = ProjectionLayer(
-                self.intrinsics_matrix)([prev_frame, depth_map, pose_prev])
+                self.intrinsics_matrix)([prev_frame, depth, pose_prev])
             next_to_target = ProjectionLayer(
-                self.intrinsics_matrix)([next_frame, depth_map, pose_next])
+                self.intrinsics_matrix)([next_frame, depth, pose_next])
             reprojections += [prev_to_target, next_to_target]
 
         reprojection_module = Model(inputs=[prev_frame, next_frame,
                                             pose_prev, pose_next,
                                             inverse_depth_1, inverse_depth_2,
                                             inverse_depth_3, inverse_depth_4],
-                                    outputs=reprojections,
+                                    outputs=(reprojections + depth_maps),
                                     name='reprojection_module')
         return reprojection_module
 
