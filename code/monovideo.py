@@ -107,7 +107,7 @@ class MonovideoModel:
                 training_epochs: Number of training epochs.
         """
         # Learning rate halving callback
-        lr_callback = self.__learning_rate_halving(start_epoch=10,
+        lr_callback = self.__learning_rate_halving(start_epoch=15,
                                                    period=5)
         checkpoint_callback = self.__model_checkpoint
         callbacks_list = [LearningRateScheduler(schedule=lr_callback,

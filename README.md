@@ -3,8 +3,10 @@ This project aims to establish a method for image-based food volume estimation
 using deep learning monocular depth estimation techniques.
 
 ## Todo
-- Keep working on point cloud volume estimation. Possibly add food-background
-  separation. Implement volume calculation based on plate surface.
+- Keep working on point cloud volume estimation. Need to filter out outliers
+  in object points because they ruin the triangulation, adding big volumes
+  to where they don't exist.
+- Maybe use another method for the volume estimation.
 - Run tests with the EPIC-Kitchens dataset. Created a training set with
   9k frames.
 - Find how to scale predicted depths to correspond to scaled depth values (m).
