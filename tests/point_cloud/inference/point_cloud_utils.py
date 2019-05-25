@@ -21,7 +21,9 @@ def ransac_plane_estimation(points, k=10):
     distances, _ = kdtree.query(points, k+1)
     mean_distances = np.mean(distances[:,1:])
     # Use ransac to estimate the plate surface parameters
-    ransac = linear_model.RANSACRegressor(residual_threshold=mean_distances)
+    ransac = linear_model.RANSACRegressor(
+        residual_threshold=mean_distances,
+        random_state=int(np.random.rand() * 100))
     ransac.fit(points[:,:2], points[:,2:])
     params = (ransac.estimator_.intercept_.tolist() 
               + ransac.estimator_.coef_[0].tolist() + [-1])
@@ -83,6 +85,7 @@ def estimate_volume(points):
             points: Volume-defining points.
         Outputs:
             total_volume: Estimated volume.
+            simplices: Triangulation resulting vertices.
     """
     # Generate triangulation of x-y plane
     tri = Delaunay(points[:,:2])
@@ -95,7 +98,8 @@ def estimate_volume(points):
     # Estimate volume as the sum of all triangulated region volumes
     volumes = area * mean_height
     total_volume = np.abs(np.sum(volumes))
-    return total_volume, tri.simplices.copy() # TODO: Remove simplices
+    simplices = tri.simplices.copy()
+    return total_volume, simplices
 
 
 def pretty_plotting(imgs, tiling, titles):
