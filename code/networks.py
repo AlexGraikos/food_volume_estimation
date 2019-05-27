@@ -7,22 +7,27 @@ from classification_models.resnet import ResNet18
 from custom_modules import *
 
 
-class Networks:
-    def __init__(self, img_shape, intrinsics_matrix):
+class NetworkBuilder:
+    def __init__(self, img_shape, intrinsics_matrix=None,
+            depth_range=[0.01, 10]):
+        # Model parameters
         self.img_shape = img_shape
         self.intrinsics_matrix = intrinsics_matrix
-        # Scale intrinsics matrix to image size (in pixel dims)
-        x_scaling = self.img_shape[1] / 1920
-        y_scaling = self.img_shape[0] / 1080
-        self.intrinsics_matrix[0, :] *= x_scaling
-        self.intrinsics_matrix[1, :] *= y_scaling
+        if intrinsics_matrix is not None:
+            # Scale intrinsics matrix to image size (in pixel dims)
+            x_scaling = self.img_shape[1] / 1920
+            y_scaling = self.img_shape[0] / 1080
+            self.intrinsics_matrix[0, :] *= x_scaling
+            self.intrinsics_matrix[1, :] *= y_scaling
+        self.depth_range = depth_range
 
 
-    def create_full_model(self):
+    def create_monovideo(self):
         """
-        Creates the full monocular depth estimation model.
+        Creates the complete monocular depth estimation model.
             Outputs:
-                full_model: The created model with all available outputs.
+                monovideo: Monocular depth estimation model, with all
+                available outputs.
         """
         # Create modules
         depth_net = self.__create_depth_net()
@@ -66,13 +71,13 @@ class Networks:
                                                       next_frame,
                                                       reprojections[6],
                                                       reprojections[7]])]
-        full_model = Model(
+        monovideo = Model(
             inputs=[curr_frame, prev_frame, next_frame],
             outputs=(augmented_inputs
                      + reprojections + per_scale_reprojections
                      + inverse_depths + depth_maps),
-            name='full_model')
-        return full_model
+            name='monovideo')
+        return monovideo 
 
 
     def __create_depth_net(self):
@@ -97,7 +102,8 @@ class Networks:
             if skip_layer is not None:
                 dec = Concatenate()([skip_layer, dec])
             dec = ReflectionPadding2D(padding=(1,1))(dec)
-            dec = Conv2D(filters=filters, kernel_size=3, activation='elu')(dec)
+            dec = Conv2D(filters=filters, kernel_size=3,
+                         activation='elu')(dec)
             return dec
 
         def inverse_depth_layer(prev_layer):
@@ -176,6 +182,7 @@ class Networks:
         pconv3 = Conv2D(filters=6, kernel_size=1, padding='same',
                         activation='linear')(pconv2)
         pose = GlobalAveragePooling2D()(pconv3)
+        # Model
         pose_net = Model(
             inputs=[source_frame, target_frame],
             outputs=pose, 
@@ -206,10 +213,14 @@ class Networks:
         inverse_depth_2_up = UpSampling2D(size=(2,2))(inverse_depth_2)
         inverse_depth_3_up = UpSampling2D(size=(4,4))(inverse_depth_3)
         inverse_depth_4_up = UpSampling2D(size=(8,8))(inverse_depth_4)
-        depth_map_1 = InverseDepthNormalization(0.01, 10)(inverse_depth_1)
-        depth_map_2 = InverseDepthNormalization(0.01, 10)(inverse_depth_2_up)
-        depth_map_3 = InverseDepthNormalization(0.01, 10)(inverse_depth_3_up)
-        depth_map_4 = InverseDepthNormalization(0.01, 10)(inverse_depth_4_up)
+        depth_map_1 = InverseDepthNormalization(
+            self.depth_range[0], self.depth_range[1])(inverse_depth_1)
+        depth_map_2 = InverseDepthNormalization(
+            self.depth_range[0], self.depth_range[1])(inverse_depth_2_up)
+        depth_map_3 = InverseDepthNormalization(
+            self.depth_range[0], self.depth_range[1])(inverse_depth_3_up)
+        depth_map_4 = InverseDepthNormalization(
+            self.depth_range[0], self.depth_range[1])(inverse_depth_4_up)
         depth_maps = [depth_map_1, depth_map_2, depth_map_3, depth_map_4]
 
         # Create reprojections for each depth map scale from highest to lowest
@@ -221,6 +232,7 @@ class Networks:
                 self.intrinsics_matrix)([next_frame, depth, pose_next])
             reprojections += [prev_to_target, next_to_target]
 
+        # Model
         reprojection_module = Model(inputs=[prev_frame, next_frame,
                                             pose_prev, pose_next,
                                             inverse_depth_1, inverse_depth_2,

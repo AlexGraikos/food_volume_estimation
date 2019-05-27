@@ -1,10 +1,11 @@
 import argparse
 import numpy as np
 import pandas as pd
-from keras.models import model_from_json
+import json
+from keras.models import Model, model_from_json
 import keras.preprocessing.image as pre
 import matplotlib.pyplot as plt
-import json
+from networks import NetworkBuilder
 from custom_modules import *
 
 
@@ -14,22 +15,34 @@ class ModelTests:
         Initializes general parameters and loads models.
         """
         self.args = self.parse_args()
-        # Load model architecture with custom model objects
-        objs = {'ProjectionLayer': ProjectionLayer, 
-                'ReflectionPadding2D': ReflectionPadding2D,
-                'InverseDepthNormalization': InverseDepthNormalization,
-                'AugmentationLayer': AugmentationLayer}
-        with open(self.args.model_file, 'r') as read_file:
-            model_architecture_json = json.load(read_file)
-            self.test_model = model_from_json(model_architecture_json,
-                                              custom_objects=objs)
-        # Load weights
-        self.test_model.load_weights(self.args.model_weights)
-        self.img_shape = self.test_model.inputs[0].shape[1:]
-        # Create test data generator
-        test_data_df = pd.read_csv(self.args.test_dataframe)
-        self.test_data_gen = self.create_test_data_gen(
-            test_data_df, self.img_shape[0], self.img_shape[1])
+        # Load testing parameters 
+        with open(self.args.config, 'r') as read_file:
+            config = json.load(read_file)
+            self.img_shape = tuple(config['img_size'])
+            self.intrinsics_mat = np.array(config['intrinsics'])
+            self.depth_range = config['depth_range']
+            self.dataset = config['name']
+        print('[*] Testing model on', self.dataset, 'dataset.')
+        print('[*] Input image size:', self.img_shape)
+        print('[*] Predicted depth range:', self.depth_range)
+        
+        # Create/Load model
+        if self.args.model_architecture is None:
+            # Network builder object 
+            nets_builder = NetworkBuilder(
+                self.img_shape, self.intrinsics_mat, self.depth_range)
+            self.monovideo = nets_builder.create_monovideo()
+            self.__set_weights_trainable(self.monovideo, False)
+        else:
+            objs = {'ProjectionLayer': ProjectionLayer, 
+                    'ReflectionPadding2D': ReflectionPadding2D,
+                    'InverseDepthNormalization': InverseDepthNormalization,
+                    'AugmentationLayer': AugmentationLayer}
+            with open(self.args.model_architecture, 'r') as read_file:
+                model_architecture_json = json.load(read_file)
+                self.monovideo = model_from_json(
+                    model_architecture_json, custom_objects=objs)
+        self.monovideo.load_weights(self.args.model_weights)
 
 
     def parse_args(self):
@@ -43,14 +56,20 @@ class ModelTests:
         parser.add_argument('--test_outputs', action='store_true',
                             help='Test all model outputs.',
                             default=False)
+        parser.add_argument('--infer_depth', action='store_true',
+                            help='Infer depth of input images.',
+                            default=False)
         parser.add_argument('--test_dataframe', type=str,
-                            help='File containing the test dataFrame.',
+                            help='Test dataFrame file (.csv).',
                             default=None)
-        parser.add_argument('--model_file', type=str,
-                            help='Model architecture file (.json).',
+        parser.add_argument('--config', type=str, 
+                            help='Dataset configuration file (.json).',
                             default=None)
         parser.add_argument('--model_weights', type=str,
                             help='Model weights file (.h5).',
+                            default=None)
+        parser.add_argument('--model_architecture', type=str,
+                            help='Model architecture file (.json).',
                             default=None)
         parser.add_argument('--n_tests', type=int,
                             help='Number of tests.',
@@ -59,17 +78,49 @@ class ModelTests:
         return args
     
 
+    def infer_depth(self, n_tests):
+        """
+        Infer depth of input images using the depth estimation network.
+            Inputs:
+                n_tests: Number of inferences to perform.
+        """
+        # Slice loaded model to get depth model
+        depth_net = self.monovideo.get_layer('depth_net')
+        self.depth_model = Model(inputs=depth_net.inputs,
+                                 outputs=depth_net.outputs,
+                                 name='depth_model')
+        # Create test data generator
+        test_data_df = pd.read_csv(self.args.test_dataframe)
+        self.test_data_gen = self.create_test_data_gen(
+            test_data_df, self.img_shape[0], self.img_shape[1])
+        for i in range(n_tests):
+            print('[-] Test Input [',i+1,'/',n_tests,']', sep='')
+            test_data = self.test_data_gen.__next__()
+            outputs = self.depth_model.predict(test_data[0])
+            # Predict and plot depth
+            inverse_depth = outputs[0][0,:,:,0]
+            depth = self.__inverse_depth_normalization(inverse_depth)
+            self.__pretty_plotting([test_data[0][0], depth], (1,2),
+                                   ['Input Frame', 'Predicted Depth'])
+            plt.show()
+
+
     def test_outputs(self, n_tests):
         """
         Plots outputs of model on input images.
             Inputs:
                 n_tests: Number of tests to perform.
         """
-        # Infer depth
+        # Create test data generator
+        test_data_df = pd.read_csv(self.args.test_dataframe)
+        self.test_data_gen = self.create_test_data_gen(
+            test_data_df, self.img_shape[0], self.img_shape[1])
+
+        # Forward pass inputs
         for i in range(n_tests):
-            print('[-] Test Input [',i+1,'/',n_tests,']',sep='')
+            print('[-] Test Input [',i+1,'/',n_tests,']', sep='')
             test_data = self.test_data_gen.__next__()
-            outputs = self.test_model.predict(test_data)
+            outputs = self.monovideo.predict(test_data)
 
             # Inputs
             inputs = [test_data[1][0], test_data[0][0], test_data[2][0]]
@@ -118,6 +169,19 @@ class ModelTests:
             plt.show()
 
 
+    def __set_weights_trainable(self, model, trainable):
+        """
+        Sets model weights to trainable/non-trainable.
+            Inputs:
+                model: Model to set weights.
+                trainable: Trainability flag.
+        """
+        for layer in model.layers:
+            layer.trainable = trainable
+            if isinstance(layer, Model):
+                self.__set_weights_trainable(layer, trainable)
+
+
     def create_test_data_gen(self, test_data_df, height, width):
         """
         Creates test data generator for the model tests.
@@ -156,6 +220,14 @@ class ModelTests:
             yield ([curr_frame, prev_frame, next_frame])
 
 
+    def __inverse_depth_normalization(self, x):
+        min_disp = 1 / self.depth_range[1]
+        max_disp = 1 / self.depth_range[0]
+        normalized_disp = (min_disp + (max_disp - min_disp) * x)
+        depth_map = 1 / normalized_disp
+        return depth_map
+
+
     def __pretty_plotting(self, imgs, tiling, titles):
         """
         Plots images in a pretty fashion.
@@ -180,8 +252,8 @@ if __name__ == '__main__':
 
     if model_tests.args.test_outputs == True:
         model_tests.test_outputs(model_tests.args.n_tests)
-    elif model_tests.args.create_pc == True:
-        model_tests.create_point_cloud(model_tests.args.input_image)
+    elif model_tests.args.infer_depth == True:
+        model_tests.infer_depth(model_tests.args.n_tests)
     else:
         print('[!] Unknown operation, use -h flag for help.')
 

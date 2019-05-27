@@ -2,13 +2,13 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
+import json
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import LearningRateScheduler, LambdaCallback
 import keras.preprocessing.image as pre
-import json
 from custom_modules import *
-from networks import Networks
+from networks import NetworkBuilder
 
 
 class MonovideoModel:
@@ -17,13 +17,17 @@ class MonovideoModel:
         Reads command-line arguments and initializes general model parameters.
         """
         self.args = self.__parse_args()
-        # Model parameters
-        self.img_shape = (self.args.img_height, self.args.img_width, 3)
+        # Load training parameters
         self.model_name = self.args.model_name
         with open(self.args.config, 'r') as read_file:
             config = json.load(read_file)
+            self.img_shape = tuple(config['img_size'])
             self.intrinsics_mat = np.array(config['intrinsics'])
+            self.depth_range = config['depth_range']
             self.dataset = config['name']
+        print('[*] Training model on', self.dataset, 'dataset.')
+        print('[*] Input image size:', self.img_shape)
+        print('[*] Predicted depth range:', self.depth_range)
 
 
     def __parse_args(self):
@@ -38,7 +42,7 @@ class MonovideoModel:
                             help='Train model.',
                             default=False)
         parser.add_argument('--train_dataframe', type=str, 
-                            help='File containing the training dataFrame.',
+                            help='Training dataFrame file (.csv).',
                             default=None)
         parser.add_argument('--config', type=str, 
                             help='Dataset configuration file (.json).',
@@ -50,14 +54,8 @@ class MonovideoModel:
                             help='Model training epochs.',
                             default=10)
         parser.add_argument('--model_name', type=str, 
-                            help='Name to use for saving model.',
+                            help='Model name, used during saving.',
                             default='monovideo')
-        parser.add_argument('--img_width', type=int, 
-                            help='Input image width.',
-                            default=224)
-        parser.add_argument('--img_height', type=int, 
-                            help='Input image height.',
-                            default=128)
         parser.add_argument('--save_per', type=int, 
                             help='Epochs between model saving.',
                             default=5)
@@ -69,11 +67,12 @@ class MonovideoModel:
         """
         Initializes model training.
         """
-        nets = Networks(self.img_shape, self.intrinsics_mat)
         # Create monovideo model
-        self.monovideo = nets.create_full_model()
-        print('[*] Created model')
+        nets_builder = NetworkBuilder(self.img_shape, self.intrinsics_mat,
+                                      self.depth_range)
+        self.monovideo = nets_builder.create_monovideo()
         self.save_model(self.monovideo, self.model_name, 'architecture')
+        print('[*] Created monovideo model.')
 
         # Synthesize training model
         augmented_inputs = self.monovideo.output[0:3]
@@ -85,7 +84,7 @@ class MonovideoModel:
                                     outputs=(per_scale_reprojections
                                              + inverse_depths),
                                     name='training_model')
-        print('[*] Created training model')
+        print('[*] Created training model.')
 
         # Compile
         adam_opt = Adam(lr=1e-4)
@@ -128,13 +127,13 @@ class MonovideoModel:
             epochs=training_epochs, verbose=1, callbacks=callbacks_list)
 
         # Save final weights and training history
-        model.save_model(self.monovideo, self.model_name, 'weights', '_final')
+        self.save_model(self.monovideo, self.model_name, 'weights', '_final')
         with open('trained_models/training_history.json', 'w') as log_file:
             json.dump(training_history.history, log_file, indent=4,
                       cls=NumpyEncoder)
             print('[*] Saving training log at', 
-                  '"trained_models/training_history.json"')
-    
+                  '"trained_models/training_history.json".')
+
 
     def save_model(self, model, name, mode, postfix=''):
         """
@@ -158,11 +157,12 @@ class MonovideoModel:
             if mode == 'weights':
                 filename = ('trained_models/' + name +
                             '_weights' + postfix + '.h5')
-                print('[*] Saving model weights at', '"' + filename + '"')
+                print('[*] Saving model weights at', '"' + filename + '".')
                 model.save_weights(filename)
             elif mode == 'architecture':
                 filename = 'trained_models/' + name + '.json'
-                print('[*] Saving model architecture at', '"' + filename + '"')
+                print('[*] Saving model architecture at',
+                      '"' + filename + '".')
                 with open(filename, 'w') as write_file:
                     model_architecture_json = model.to_json()
                     json.dump(model_architecture_json, write_file)
@@ -219,7 +219,7 @@ class MonovideoModel:
             else:
                 if (epoch-(start_epoch-1)) % period == 0:
                     print('[*] Halving learning rate',
-                          '(=',curr_lr,' -> ',(curr_lr / 2.0),')', sep='')
+                          '(=',curr_lr,' -> ',(curr_lr / 2.0),').', sep='')
                     return curr_lr / 2.0
                 else:
                     return curr_lr
