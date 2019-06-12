@@ -1,7 +1,7 @@
 import tensorflow as tf
 import keras.backend as K
 from keras.layers import Layer
-from inference.project import *
+from modules.project import *
 import json
 
 

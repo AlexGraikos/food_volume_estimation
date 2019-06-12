@@ -13,6 +13,9 @@ results/*
 
 # Filetypes to NOT ignore
 !*.gitkeep
+!tests/point_cloud/results/*
 
 # Extras
 code/monogan.py
+tests/point_cloud/.ipynb_checkpoints/*
+tests/point_cloud/pyntcloud*

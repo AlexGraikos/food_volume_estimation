@@ -3,15 +3,32 @@ This project aims to establish a method for image-based food volume estimation
 using deep learning monocular depth estimation techniques.
 
 ## Todo
-- Keep working on point cloud volume estimation. Need to filter out outliers
-  in object points because they ruin the triangulation, adding big volumes
-  to where they don't exist.
-- Maybe use another method for the volume estimation.
-- Run tests with the EPIC-Kitchens dataset. Created a training set with
-  9k frames.
-- Find how to scale predicted depths to correspond to scaled depth values (m).
-  Some tests show that it may not be as necessary as I think.
+- Calibrate depth predictions. Find a rescaling factor that maps predicted
+  depths to real-world depth values.
+- Volume estimation is still debated. Fitting volume primitives based on
+  food detection seems to be the best approach.
+- Train the high-res model (448x256 inputs).
 
 ## Done
-- Added RANSAC plate surface estimation.
-- Stride 10 for set creation is ok (including optical flow filtering).
+- Trained low-res model (224x128 inputs) and achieved promising results.
+  Examples:
+
+<p align="center">
+  <b>Example 1<sup>[1]</sup></b>: <br>
+  <img src="tests/point_cloud/results/test_1_depth.png" width="608">
+</p>
+
+<p align="center">
+  <b>Example 1<sup>[1]</sup></b>: <br>
+  <img src="tests/point_cloud/results/test_2_depth.png" width="608">
+</p>
+
+<p align="center">
+  <b>Example 1<sup>[1]</sup></b>: <br>
+  <img src="tests/point_cloud/results/test_3_depth.png" width="608">
+</p>
+
+<p align="center">
+  <b>Example 1<sup>[1]</sup></b>: <br>
+  <img src="tests/point_cloud/results/test_4_depth.png" width="608">
+</p>
