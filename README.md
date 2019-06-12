@@ -13,7 +13,7 @@ using deep learning monocular depth estimation techniques.
 - Trained low-res model (224x128 inputs) and achieved promising results.
   Examples:
   
-<table align="center" width="100%">
+<table align="center" width="100%" border="0">
   <tr>
     <td>
       <b>Example 1</b>: <br>
