@@ -20,17 +20,17 @@ using deep learning monocular depth estimation techniques.
       <img src="tests/point_cloud/results/test_1_depth.png">
     </td>
     <td>
-      <b>Example 1</b>: <br>
+      <b>Example 2</b>: <br>
       <img src="tests/point_cloud/results/test_2_depth.png">
     </td>
   </tr>
   <tr>
     <td>
-      <b>Example 1</b>: <br>
+      <b>Example 3</b>: <br>
       <img src="tests/point_cloud/results/test_3_depth.png">
     </td>
     <td>
-      <b>Example 1</b>: <br>
+      <b>Example 4</b>: <br>
       <img src="tests/point_cloud/results/test_4_depth.png">
     </td>      
   </tr>
