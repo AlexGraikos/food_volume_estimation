@@ -92,7 +92,7 @@ class MonovideoModel:
         loss_list = ([custom_losses.reprojection_loss() for s in range(4)] 
                      + [custom_losses.depth_smoothness() for s in range(4)])
         loss_weights = ([1 for s in range(4)]
-                        + [(0.001 / (2 ** s)) for s in range(4)])
+                        + [(0.01 / (2 ** s)) for s in range(4)])
         self.training_model.compile(adam_opt, loss=loss_list,
                                  loss_weights=loss_weights)
 
@@ -107,7 +107,7 @@ class MonovideoModel:
         """
         # Learning rate halving callback
         lr_callback = self.__learning_rate_halving(start_epoch=15,
-                                                   period=5)
+                                                   period=6)
         checkpoint_callback = self.__model_checkpoint
         callbacks_list = [LearningRateScheduler(schedule=lr_callback,
                                                 verbose=0),

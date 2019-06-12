@@ -2,18 +2,17 @@
 code/trained_models/*
 datasets/*
 sources/*
-tests/warping_test/test_images
-tests/point_cloud/.ipynb_checkpoints/*
-tests/point_cloud/pyntcloud_plot_assets/*
+results/*
 
 # Filetypes to ignore
 *.pyc
 *.png
 *.jpg
+*.pfm
+*.ply
 
 # Filetypes to NOT ignore
 !*.gitkeep
 
 # Extras
 code/monogan.py
-tests/point_cloud/plotVG.html
