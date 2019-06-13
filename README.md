@@ -12,23 +12,26 @@ using deep learning monocular depth estimation techniques.
 ## Done
 - Trained low-res model (224x128 inputs) and achieved promising results.
   Examples:
-
-<p align="center">
-  <b>Example 1<sup>[1]</sup></b>: <br>
-  <img src="tests/point_cloud/results/test_1_depth.png" width="608">
-</p>
-
-<p align="center">
-  <b>Example 1<sup>[1]</sup></b>: <br>
-  <img src="tests/point_cloud/results/test_2_depth.png" width="608">
-</p>
-
-<p align="center">
-  <b>Example 1<sup>[1]</sup></b>: <br>
-  <img src="tests/point_cloud/results/test_3_depth.png" width="608">
-</p>
-
-<p align="center">
-  <b>Example 1<sup>[1]</sup></b>: <br>
-  <img src="tests/point_cloud/results/test_4_depth.png" width="608">
-</p>
+  
+<table align="center" width="100%" border="0">
+  <tr>
+    <td>
+      <b>Example 1</b>: <br>
+      <img src="tests/point_cloud/results/test_1_depth.png">
+    </td>
+    <td>
+      <b>Example 2</b>: <br>
+      <img src="tests/point_cloud/results/test_2_depth.png">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <b>Example 3</b>: <br>
+      <img src="tests/point_cloud/results/test_3_depth.png">
+    </td>
+    <td>
+      <b>Example 4</b>: <br>
+      <img src="tests/point_cloud/results/test_4_depth.png">
+    </td>      
+  </tr>
+</table> 
