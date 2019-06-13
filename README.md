@@ -50,7 +50,7 @@ where the ```data_sources file``` contains the directories in which the images a
 You can also create a training set from multiple EPIC-Kitchens source directories, resizing the images and applying optical flow filtering ([proposed by Zhou et al.](https://people.eecs.berkeley.edu/~tinghuiz/projects/SfMLearner/cvpr17_sfm_final.pdf)) to reduce overall training costs:
 ```
 data_utils.py --create_EPIC_set --data_source data_sources --save_target save_dir 
-  --target_width W --target_height H --interp [nearest/bilinear/cubic]
+  --target_width W --target_height H --interp [nearest/bilinear/cubic] --stride S
   ```
 To avoid redefining the data sources after creating and saving a training set of images, use the ```create_dir_df``` flag:
 ```
