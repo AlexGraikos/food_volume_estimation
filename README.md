@@ -2,10 +2,12 @@
 Using monocular depth estimation to estimate food volume in an input image.
 
 ## Method
+#### Depth Network Training
 A monocular depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf) . The sequences used for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes many hours of egocentric, food handling videos. 
 
 ![Depth Network Training](/sources/depth_train.png)
 
+#### Volume Estimation
 The food input image is passed through the trained depth network and the predicted depth map, along with the camera intrinsics, are used to generate a corresponding point cloud.
 
 ![Volume Estimation](/sources/vol_est.png)
@@ -34,7 +36,7 @@ and a JSON file (```config.json```) that describes various training parameters:
   "depth_range": [0.01, 10]
 }
 ```
-The model architecture is saved in ```name.json``` file when the model is instantiated whereas the model weights are saved in ```name_weights_[epoch_e/final].h5``` every ```S``` epochs and when training is complete ([H5 format](https://www.h5py.org/)). All outputs are stored in the ```trained_models``` directory.
+The model architecture is saved in ```name.json``` when the model is instantiated whereas the model weights are saved in ```name_weights_[epoch_e/final].h5``` every ```S``` epochs and when training is complete ([H5 format](https://www.h5py.org/)). All outputs are stored in the ```trained_models``` directory.
 
 The triplet-defining dataFrame can be created using the ```data_utils.py``` script as:
 ```
@@ -66,7 +68,7 @@ model_tests.py --test_outputs --test_dataframe test_df.csv --config config.json
 model_tests.py --infer_depth --test_dataframe test_df.csv --config config.json 
   --model_architecture model_name.json --model_weights model_name_weights.h5 --n_tests 5
 ```
-Again, a Pandas dataFrame defining the frame triplets is required, since the full outputs test generates the source to target frame reconstructions. All tests are performed without data augmentation.
+Again, a Pandas dataFrame defining the frame triplets is required, since the all-outputs test generates the source to target frame reconstructions. All tests are performed without data augmentation.
 
 
 ## Volume Estimation
