@@ -56,7 +56,7 @@ To avoid redefining the data sources after creating and saving a training set of
 ```
 data_utils.py --create_dir_df --data_source img_dir --save_target df.csv --stride S
 ```
-
+The recommended stride value for the EPIC-Kitchens dataset is 10.
 
 ## Testing
 The ```model_tests.py``` script offers testing of either all network outputs or the full-scale predicted depth:
