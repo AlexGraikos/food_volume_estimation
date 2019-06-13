@@ -15,7 +15,7 @@ The food input image is passed through the trained depth network and the predict
 To train the depth estimation network use the ```monovideo.py``` script as:
 ```
 monovideo.py --train --train_dataframe dataFrame.csv --config config.json 
-   --batch_size B --training_epochs E --model_name monovideo --save_per S
+   --batch_size B --training_epochs E --model_name name --save_per S
 ```
 The required arguments include  a [Pandas](https://pandas.pydata.org/) dataFrame (```dataframe.csv```) containing paths to frame triplets:
 
@@ -34,12 +34,13 @@ and a JSON file (```config.json```) that describes various training parameters:
   "depth_range": [0.01, 10]
 }
 ```
+The model architecture is saved in ```name.json``` file when the model is instantiated whereas the model weights are saved in ```name_weights_[epoch_e/final].h5``` every ```S``` epochs and when training is complete ([H5 format](https://www.h5py.org/)). All outputs are stored in the ```trained_models``` directory.
 
 The triplet-defining dataFrame can be created using the ```data_utils.py``` script as:
 ```
 data_utils.py --create_set_df --data_source data_sources --save_target df.csv --stride S
 ```
-where the data_sources file contains the directories in which the images are saved. For example:
+where the ```data_sources file``` contains the directories in which the images are saved. For example:
 ```
 /home/usr/food_volume_estimation/datasets/EPIC_KITCHENS_2018/frames/rgb/train/P01/P03_3/
 /home/usr/food_volume_estimation/datasets/EPIC_KITCHENS_2018/frames/rgb/train/P01/P05_1/
@@ -59,13 +60,13 @@ data_utils.py --create_dir_df --data_source img_dir --save_target df.csv --strid
 The ```model_tests.py``` script offers testing of either all network outputs or the full-scale predicted depth:
 ```
 model_tests.py --test_outputs --test_dataframe test_df.csv --config config.json 
-  --model_architecture monovideo.json --model_weights monovideo_weights.h5 --n_tests 5
+  --model_architecture model_name.json --model_weights model_name_weights.h5 --n_tests 5
 ```
 ```
 model_tests.py --infer_depth --test_dataframe test_df.csv --config config.json 
-  --model_architecture monovideo.json --model_weights monovideo_weights.h5 --n_tests 5
+  --model_architecture model_name.json --model_weights model_name_weights.h5 --n_tests 5
 ```
-Again, a Pandas dataFrame defining the frame triplets is required, since the full outputs test generates the source to target frame reconstructions. The model architecture and weights files are created automatically by the ```monovideo.py``` script when executed and are by default saved in ```code/trained_models```. All tests are performed without data augmentation.
+Again, a Pandas dataFrame defining the frame triplets is required, since the full outputs test generates the source to target frame reconstructions. All tests are performed without data augmentation.
 
 
 ## Volume Estimation
