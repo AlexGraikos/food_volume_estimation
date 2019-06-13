@@ -65,11 +65,11 @@ class ModelTests:
         parser.add_argument('--config', type=str, 
                             help='Dataset configuration file (.json).',
                             default=None)
-        parser.add_argument('--model_weights', type=str,
-                            help='Model weights file (.h5).',
-                            default=None)
         parser.add_argument('--model_architecture', type=str,
                             help='Model architecture file (.json).',
+                            default=None)
+        parser.add_argument('--model_weights', type=str,
+                            help='Model weights file (.h5).',
                             default=None)
         parser.add_argument('--n_tests', type=int,
                             help='Number of tests.',

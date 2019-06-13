@@ -40,6 +40,13 @@ class AugmentationLayer(Layer):
         return y
         
     def __augment_inputs(self, x):
+        """
+        Input augmentation function.
+            Inputs:
+                x: Input frame triplet. 
+            Outputs:
+                aug_x: Augmented input frames.
+        """
         # Unpack inputs
         curr_frame = x[0]
         prev_frame = x[1]

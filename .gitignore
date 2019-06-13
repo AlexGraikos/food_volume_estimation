@@ -14,6 +14,8 @@ results/*
 # Filetypes to NOT ignore
 !*.gitkeep
 !tests/point_cloud/results/*
+!sources/depth_train.png
+!sources/vol_est.png
 
 # Extras
 code/monogan.py
