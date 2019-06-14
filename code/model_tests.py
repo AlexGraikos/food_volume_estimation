@@ -91,16 +91,16 @@ class ModelTests:
                                  name='depth_model')
         # Create test data generator
         test_data_df = pd.read_csv(self.args.test_dataframe)
-        self.test_data_gen = self.create_test_data_gen(
-            test_data_df, self.img_shape[0], self.img_shape[1])
+        self.test_data_gen = DataGenerator(
+            test_data_df, self.img_shape[0], self.img_shape[1], 1, False)
         for i in range(n_tests):
             print('[-] Test Input [',i+1,'/',n_tests,']', sep='')
-            test_data = self.test_data_gen.__next__()
-            outputs = self.depth_model.predict(test_data[0])
+            test_data = self.test_data_gen.__getitem__(i)[0][0]
+            outputs = self.depth_model.predict(test_data)
             # Predict and plot depth
             inverse_depth = outputs[0][0,:,:,0]
             depth = self.__inverse_depth_normalization(inverse_depth)
-            self.__pretty_plotting([test_data[0][0], depth], (1,2),
+            self.__pretty_plotting([test_data[0], depth], (1,2),
                                    ['Input Frame', 'Predicted Depth'])
             plt.show()
 
@@ -113,13 +113,13 @@ class ModelTests:
         """
         # Create test data generator
         test_data_df = pd.read_csv(self.args.test_dataframe)
-        self.test_data_gen = self.create_test_data_gen(
-            test_data_df, self.img_shape[0], self.img_shape[1])
+        self.test_data_gen = DataGenerator(
+            test_data_df, self.img_shape[0], self.img_shape[1], 1, False)
 
         # Forward pass inputs
         for i in range(n_tests):
             print('[-] Test Input [',i+1,'/',n_tests,']', sep='')
-            test_data = self.test_data_gen.__next__()
+            test_data = self.test_data_gen.__getitem__(i)[0]
             outputs = self.monovideo.predict(test_data)
 
             # Inputs
@@ -180,44 +180,6 @@ class ModelTests:
             layer.trainable = trainable
             if isinstance(layer, Model):
                 self.__set_weights_trainable(layer, trainable)
-
-
-    def create_test_data_gen(self, test_data_df, height, width):
-        """
-        Creates test data generator for the model tests.
-            Inputs:
-                test_data_df: The dataframe containing the paths 
-                              to frame triplets.
-                height: Input image height.
-                width: Input image width.
-                n_tests: Generated batch sizes.
-            Outputs:
-                (inputs) tuple for tests.
-        """
-        # Image preprocessor
-        datagen = pre.ImageDataGenerator(rescale=1/255, fill_mode='nearest')
-
-        # Frame generators - use same seed to ensure continuity
-        seed = int(np.random.rand(1,1)*1000)
-        curr_generator = datagen.flow_from_dataframe(
-            test_data_df, directory=None, x_col='curr_frame',
-            target_size=(height,width), batch_size=1,
-            interpolation='bilinear', class_mode=None, seed=seed)
-        prev_generator = datagen.flow_from_dataframe(
-            test_data_df, directory=None, x_col='prev_frame',
-            target_size=(height,width), batch_size=1,
-            interpolation='bilinear', class_mode=None, seed=seed)
-        next_generator = datagen.flow_from_dataframe(
-            test_data_df, directory=None, x_col='next_frame',
-            target_size=(height,width), batch_size=1,
-            interpolation='bilinear', class_mode=None, seed=seed)
-    
-        while True:
-            curr_frame = curr_generator.__next__()
-            prev_frame = prev_generator.__next__()
-            next_frame = next_generator.__next__()
-
-            yield ([curr_frame, prev_frame, next_frame])
 
 
     def __inverse_depth_normalization(self, x):

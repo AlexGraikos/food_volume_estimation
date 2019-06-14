@@ -115,16 +115,14 @@ class MonovideoModel:
         
         # Training data generator
         training_data_df = pd.read_csv(train_df_file)
-        num_samples = training_data_df.shape[0]
-        steps_per_epoch = num_samples//batch_size
-        training_data_gen = self.create_training_data_gen(
+        train_data_generator = DataGenerator(
             training_data_df, self.img_shape[0], self.img_shape[1],
-            batch_size)
+            batch_size, True)
 
         # Train model
         training_history = self.training_model.fit_generator(
-            training_data_gen, steps_per_epoch=steps_per_epoch,
-            epochs=training_epochs, verbose=1, callbacks=callbacks_list)
+            train_data_generator, epochs=training_epochs, verbose=1,
+            callbacks=callbacks_list, workers=4, use_multiprocessing=True)
 
         # Save final weights and training history
         self.save_model(self.monovideo, self.model_name, 'weights', '_final')
@@ -224,57 +222,6 @@ class MonovideoModel:
                 else:
                     return curr_lr
         return halve_lr
-
-
-    def create_training_data_gen(self, training_data_df, height, width,
-            batch_size):
-        """
-        Creates tranining data generator for the training model.
-            Inputs:
-                training_data_df: Dataframe with the paths to frame triplets.
-                height: Input image height.
-                width: Input image width.
-                batch_size: Generated batch sizes.
-            Outputs:
-                ([inputs], [outputs]) tuple for model training.
-        """
-        # Image preprocessor. Horizontal flipping is applied to both
-        # inputs and target outputs
-        datagen = pre.ImageDataGenerator(rescale=1/255,
-                                         horizontal_flip=True,
-                                         fill_mode='nearest')
-
-        # Frame generators - use same seed to ensure continuity
-        seed = int(np.random.rand(1)*1000)
-        curr_generator = datagen.flow_from_dataframe(
-            training_data_df, directory=None, x_col='curr_frame',
-            target_size=(height,width), batch_size=batch_size,
-            interpolation='bilinear', class_mode=None, seed=seed)
-        prev_generator = datagen.flow_from_dataframe(
-            training_data_df, directory=None, x_col='prev_frame',
-            target_size=(height,width), batch_size=batch_size,
-            interpolation='bilinear', class_mode=None, seed=seed)
-        next_generator = datagen.flow_from_dataframe(
-            training_data_df, directory=None, x_col='next_frame',
-            target_size=(height,width), batch_size=batch_size,
-            interpolation='bilinear', class_mode=None, seed=seed)
-    
-        while True:
-            curr_frame = curr_generator.__next__()
-            prev_frame = prev_generator.__next__()
-            next_frame = next_generator.__next__()
-
-            # Returns (inputs,outputs) tuple
-            batch_size_curr = curr_frame.shape[0]
-            curr_frame_list = [curr_frame for _ in range(4)]
-            # Downsample curr frame
-            curr_frame_scales = []
-            for s in [1, 2, 4, 8]:
-                curr_frame_scales += [curr_frame[:,::s,::s,:]]
-
-            yield ([curr_frame, prev_frame, next_frame], 
-                   (curr_frame_list + curr_frame_scales))
-
 
 
 if __name__ == '__main__':

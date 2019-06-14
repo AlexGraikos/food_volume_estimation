@@ -20,6 +20,7 @@ class NetworkBuilder:
             self.intrinsics_matrix[0, :] *= x_scaling
             self.intrinsics_matrix[1, :] *= y_scaling
         self.depth_range = depth_range
+        self.custom_losses = Losses()
 
 
     def create_monovideo(self):
@@ -54,21 +55,21 @@ class NetworkBuilder:
         depth_maps = module_outputs[8:]
         # Inputs and per-scale reprojections for automasking and 
         # per-scale min loss
+        source_loss = Lambda(
+            self.custom_losses.compute_source_loss,
+            arguments={'alpha': 0.85})(
+            [curr_frame, prev_frame, next_frame])
         per_scale_reprojections = [
-            Concatenate(name='scale1_reprojections')([prev_frame,
-                                                      next_frame, 
+            Concatenate(name='scale1_reprojections')([source_loss,
                                                       reprojections[0],
                                                       reprojections[1]]),
-            Concatenate(name='scale2_reprojections')([prev_frame,
-                                                      next_frame,
+            Concatenate(name='scale2_reprojections')([source_loss,
                                                       reprojections[2],
                                                       reprojections[3]]),
-            Concatenate(name='scale3_reprojections')([prev_frame,
-                                                      next_frame,
+            Concatenate(name='scale3_reprojections')([source_loss,
                                                       reprojections[4],
                                                       reprojections[5]]),
-            Concatenate(name='scale4_reprojections')([prev_frame,
-                                                      next_frame,
+            Concatenate(name='scale4_reprojections')([source_loss,
                                                       reprojections[6],
                                                       reprojections[7]])]
         monovideo = Model(

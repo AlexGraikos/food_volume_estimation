@@ -1,8 +1,11 @@
+import json
+import pandas as pd
+import cv2
 import tensorflow as tf
 import keras.backend as K
 from keras.layers import Layer
+from keras.utils import Sequence
 from project import *
-import json
 
 
 class AugmentationLayer(Layer):
@@ -213,10 +216,9 @@ class Losses():
                 reprojection_loss: Reprojection Keras-style loss function
         """
         def reprojection_loss_keras(y_true, y_pred):
-            prev_frame = y_pred[:,:,:,:3]
-            next_frame = y_pred[:,:,:,3:6]
-            reprojection_prev = y_pred[:,:,:,6:9]
-            reprojection_next = y_pred[:,:,:,9:12]
+            source_loss = y_pred[:,:,:,:3]
+            reprojection_prev = y_pred[:,:,:,3:6]
+            reprojection_next = y_pred[:,:,:,6:9]
 
             # Reprojection MAE
             reprojection_prev_mae = K.mean(K.abs(y_true - reprojection_prev),
@@ -233,27 +235,37 @@ class Losses():
             # Total loss
             reprojection_loss = (alpha * scale_min_ssim 
                                  + (1 - alpha) * scale_min_mae)
-
             if masking:
-                # Source frame MAE
-                prev_mae = K.mean(K.abs(y_true - prev_frame), axis=-1,
-                                  keepdims=True)
-                next_mae = K.mean(K.abs(y_true - next_frame), axis=-1,
-                                  keepdims=True)
-                source_min_mae  = K.minimum(prev_mae, next_mae)
-                # Source frame SSIM
-                prev_ssim = self.__ssim(y_true, prev_frame)
-                next_ssim = self.__ssim(y_true, next_frame)
-                source_min_ssim = K.minimum(prev_ssim, next_ssim)
-
-                source_loss = (alpha * source_min_ssim
-                               + (1 - alpha) * source_min_mae)
                 mask = K.less(reprojection_loss, source_loss)
                 reprojection_loss *= K.cast(mask, 'float32')
 
             return reprojection_loss
 
         return reprojection_loss_keras
+
+
+    def compute_source_loss(self, x, alpha=0.85):
+        """
+        Compute minimum reprojection loss using the prev and next frames
+        as reprojections.
+        """
+        y_true = x[0]
+        prev_frame = x[1]
+        next_frame = x[2]
+
+        # Source frame MAE
+        prev_mae = K.mean(K.abs(y_true - prev_frame), axis=-1,
+                          keepdims=True)
+        next_mae = K.mean(K.abs(y_true - next_frame), axis=-1,
+                          keepdims=True)
+        source_min_mae  = K.minimum(prev_mae, next_mae)
+        # Source frame SSIM
+        prev_ssim = self.__ssim(y_true, prev_frame)
+        next_ssim = self.__ssim(y_true, next_frame)
+        source_min_ssim = K.minimum(prev_ssim, next_ssim)
+        source_loss = (alpha * source_min_ssim
+                       + (1 - alpha) * source_min_mae)
+        return source_loss
 
 
     def depth_smoothness(self):
@@ -334,3 +346,79 @@ class NumpyEncoder(json.JSONEncoder):
         elif isinstance(obj,(np.ndarray,)):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+class DataGenerator(Sequence):
+    """
+    Generates batches of frame triplets, with given size.
+    """
+    def __init__(self, data_df, height, width, batch_size, flipping):
+        self.data_df = data_df
+        self.target_size = (width, height)
+        self.batch_size = batch_size
+        self.flipping = flipping
+        print('[*] Found', self.data_df.shape[0], 'frame triplets.')
+        np.random.shuffle(self.data_df.values)
+
+    def __len__(self):
+        num_samples = self.data_df.shape[0]
+        return num_samples // self.batch_size
+
+    def on_epoch_end(self):
+        # Shuffle data samples on epoch end
+        np.random.shuffle(self.data_df.values)
+
+    def __read_img(self, path, flip):
+        """
+        Load input image and flip if specified.
+            Inputs:
+                path: Path to input image.
+                flip: Flipping flag.
+            Outputs:
+                img: Loaded image with pixel values [0,1].
+        """
+        img = cv2.imread(path, cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if self.flipping and flip:
+            img = cv2.flip(img, 1)
+        img = cv2.resize(img, self.target_size,
+                         interpolation=cv2.INTER_LINEAR)
+        return img.astype(np.float32) / 255
+
+    def __getitem__(self, idx):
+        """
+        Generate and return network training data.
+            Inputs:
+                idx: Index of current batch.
+            Outputs:
+                ([inputs], [outputs]) tuple for model training.
+        """
+        # Load file paths to current batch images
+        curr_batch_fp = self.data_df.iloc[
+            idx * self.batch_size : (idx + 1) * self.batch_size, 0].values
+        prev_batch_fp = self.data_df.iloc[
+            idx * self.batch_size : (idx + 1) * self.batch_size, 1].values
+        next_batch_fp = self.data_df.iloc[
+            idx * self.batch_size : (idx + 1) * self.batch_size, 2].values
+
+        # Load and flip horizontally with probability 0.5
+        horizontal_flips = np.random.rand(self.batch_size) > 0.5
+        curr_frame = np.array(
+            [self.__read_img(curr_batch_fp[i], horizontal_flips[i])
+             for i in range(curr_batch_fp.shape[0])])
+        prev_frame = np.array(
+            [self.__read_img(prev_batch_fp[i], horizontal_flips[i])
+             for i in range(prev_batch_fp.shape[0])])
+        next_frame = np.array(
+            [self.__read_img(next_batch_fp[i], horizontal_flips[i])
+             for i in range(next_batch_fp.shape[0])])
+
+        # Return (inputs,outputs) tuple
+        curr_frame_list = [curr_frame for _ in range(4)]
+        curr_frame_scales = []
+        for s in [1, 2, 4, 8]:
+            curr_frame_scales += [curr_frame[:,::s,::s,:]]
+
+        return ([curr_frame, prev_frame, next_frame],
+                (curr_frame_list + curr_frame_scales))
+
