@@ -122,7 +122,7 @@ class MonovideoModel:
         # Train model
         training_history = self.training_model.fit_generator(
             train_data_generator, epochs=training_epochs, verbose=1,
-            callbacks=callbacks_list, workers=4, use_multiprocessing=True)
+            callbacks=callbacks_list)
 
         # Save final weights and training history
         self.save_model(self.monovideo, self.model_name, 'weights', '_final')
