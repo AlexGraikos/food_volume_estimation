@@ -47,6 +47,9 @@ class MonovideoModel:
         parser.add_argument('--config', type=str, 
                             help='Dataset configuration file (.json).',
                             default=None)
+        parser.add_argument('--starting_weights', type=str,
+                            help='Starting weights file (.h5).',
+                            default=None)
         parser.add_argument('--batch_size', type=int, 
                             help='Training batch size.',
                             default=8)
@@ -73,6 +76,15 @@ class MonovideoModel:
         self.monovideo = nets_builder.create_monovideo()
         self.save_model(self.monovideo, self.model_name, 'architecture')
         print('[*] Created monovideo model.')
+        if self.args.starting_weights is not None:
+            ## Keras bug - cannot load nested models if weights are trainable
+            self.__set_weights_trainable(self.monovideo, False)
+            ###################################################
+            self.monovideo.load_weights(self.args.starting_weights)
+            print('[*] Initialized weights from:', self.args.starting_weights)
+            ## Keras bug - cannot load nested models if weights are trainable
+            self.__set_weights_trainable(self.monovideo, True)
+            ###################################################
 
         # Synthesize training model
         augmented_inputs = self.monovideo.output[0:3]
@@ -105,9 +117,9 @@ class MonovideoModel:
                 batch_size: Training batch size.
                 training_epochs: Number of training epochs.
         """
-        # Learning rate halving callback
-        lr_callback = self.__learning_rate_halving(start_epoch=15,
-                                                   period=6)
+        # Learning rate dropping callback
+        lr_callback = self.__learning_rate_dropping(
+            factor=2, start_epoch=15, period=6)
         checkpoint_callback = self.__model_checkpoint
         callbacks_list = [LearningRateScheduler(schedule=lr_callback,
                                                 verbose=0),
@@ -201,27 +213,30 @@ class MonovideoModel:
                 self.__set_weights_trainable(layer, trainable)
     
 
-    def __learning_rate_halving(self, start_epoch, period):
+    def __learning_rate_dropping(self, factor, start_epoch, period):
         """
-        Creates callback function to halve learning rate during training.
+        Creates callback function to reduce learning rate by given factor
+        during training.
             Inputs:
-                start_epoch: First epoch to halve learning rate at.
-                period: Learning rate halving epoch period.
+                factor: Learning rate reduction factor.
+                start_epoch: First epoch to reduce learning rate at.
+                period: Learning rate reduction epoch period.
             Outputs:
-                halve_lr: Learning rate halving callback function.
+                drop_lr: Learning rate dropping callback function.
         """
-        def halve_lr(epoch, curr_lr):
+        def drop_lr(epoch, curr_lr):
             # Epochs are zero-indexed
-            if (epoch < start_epoch-1):
+            if (epoch < start_epoch - 1):
                 return curr_lr
             else:
-                if (epoch-(start_epoch-1)) % period == 0:
-                    print('[*] Halving learning rate',
-                          '(=',curr_lr,' -> ',(curr_lr / 2.0),').', sep='')
-                    return curr_lr / 2.0
+                if (epoch - (start_epoch - 1)) % period == 0:
+                    print('[*] Reducing learning rate /', factor,
+                          ' (', curr_lr, ' -> ', (curr_lr / factor), ').',
+                          sep='')
+                    return curr_lr / factor
                 else:
                     return curr_lr
-        return halve_lr
+        return drop_lr
 
 
 if __name__ == '__main__':
