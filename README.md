@@ -116,10 +116,11 @@ Low-res model examples:
 
 Example 1 | Example 2
 ------------ | -------------
-![Example 1](/assets/readme_assets/test_1_depth.png) | ![Example 2](/assets/readme_assets/test_2_depth.png)
+![Example 1: Estimated Volume 1.30L](/assets/readme_assets/test_1_depth.png) | 
+![Example 2: Estimated Volume 2.68L](/assets/readme_assets/test_2_depth.png)
 
 Example 3 | Example 4
 ------------ | -------------
-![Example 1](/assets/readme_assets/test_3_depth.png) | ![Example 2](/assets/readme_assets/test_4_depth.png)
-</table> 
+![Example 3: Estimated Volume 0.47L (Failed due to scene complexity)](/assets/readme_assets/test_3_depth.png) | 
+![Example 4: Estimated Volume 0.10L (Failed due to segmentation)](/assets/readme_assets/test_4_depth.png)
 

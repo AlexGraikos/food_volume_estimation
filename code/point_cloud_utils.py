@@ -118,3 +118,5 @@ def pretty_plotting(imgs, tiling, titles):
         plt.subplot(rows + cols + str(r + 1))
         plt.title(titles[r])
         plt.imshow(imgs[r])
+        plt.colorbar()
+
