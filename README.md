@@ -5,12 +5,12 @@ Using monocular depth estimation to estimate food volume in an input image.
 #### Depth Network Training
 A monocular depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf) . The sequences used for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes many hours of egocentric, food handling videos. 
 
-![Depth Network Training](/sources/depth_train.png)
+![Depth Network Training](/assets/readme_assets/depth_train.png)
 
 #### Volume Estimation
 The food input image is passed through the trained depth network and the predicted depth map, along with the camera intrinsics, are used to generate a corresponding point cloud.
 
-![Volume Estimation](/sources/vol_est.png)
+![Volume Estimation](/assets/readme_assets/vol_est.png)
 
 
 ## Training
@@ -88,10 +88,10 @@ Low-res model examples:
 
 Example 1 | Example 2
 ------------ | -------------
-![Example 1](/tests/point_cloud/results/test_1_depth.png) | ![Example 2](/tests/point_cloud/results/test_2_depth.png)
+![Example 1](/assets/readme_assets/test_1_depth.png) | ![Example 2](/assets/readme_assets/test_2_depth.png)
 
 Example 3 | Example 4
 ------------ | -------------
-![Example 1](/tests/point_cloud/results/test_1_depth.png) | ![Example 2](/tests/point_cloud/results/test_2_depth.png)
+![Example 1](/assets/readme_assets/test_3_depth.png) | ![Example 2](/assets/readme_assets/test_4_depth.png)
 </table> 
 
