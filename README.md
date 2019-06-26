@@ -103,7 +103,10 @@ If you wish to visualize the volume estimation pipeline, run the example noteboo
 
 
 ## Models
-Download links for the models will be put here.
+Download links for the pre-trained models:
+- Low-res model:
+  - Architecture: https://drive.google.com/open?id=1IJ4k1TtFpConpkJVsGf37F-WWJ1rmP4Y
+  - Weights: https://drive.google.com/open?id=1mFvc20GbzUGyo9xl401BNxGNSLiKEewr
 
 
 ## Todo
