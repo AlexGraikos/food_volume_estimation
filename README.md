@@ -108,7 +108,7 @@ Download links for the models will be put here.
 
 ## Todo
 - [x] Trained low-res model (224x128 inputs) and achieved promising results.
-- [X] Calibrate depth predictions. Rescaling factor estimated at 0.55.
+- [ ] Calibrate depth predictions.
 - [X] Train the high-res model (448x256 inputs). No obvious advantages observed.
 - [ ] Fitting volume primitives based on food detection could improve volume estimation.
 
