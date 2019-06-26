@@ -114,11 +114,8 @@ Download links for the models will be put here.
 
 Low-res model examples:
 
-Example 1: Estimated Volume 1.30L | Example 2: Estimated Volume 0.77L
+Example 1 | Example 2
 ------------ | -------------
 ![Example 1](/assets/readme_assets/test_1_depth.png) | ![Example 2](/assets/readme_assets/test_2_depth.png)
 
-Example 3: Estimated Volume 0.72L (Scene is very complex - hard to estimate plate surface) | Example 4: Estimated Volume 1.12L (Segmentation included whole plate)
------------- | -------------
-![Example 3](/assets/readme_assets/test_3_depth.png) | ![Example 4](/assets/readme_assets/test_4_depth.png)
 

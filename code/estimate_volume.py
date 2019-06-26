@@ -85,7 +85,7 @@ class VolumeEstimator():
                             default=None)
         parser.add_argument('--depth_rescaling', type=float,
                             help='Depth rescaling factor.',
-                            default=0.55)
+                            default=1)
         parser.add_argument('--min_depth', type=float,
                             help='Minimum depth value.',
                             default=0.01)

@@ -6,6 +6,8 @@ datasets/PFID_Stereo_Images/*
 results/*
 tests/*
 jupyter/*
+tex/*
+assets/volume_tests/*
 
 # Filetypes to ignore
 *.pyc
