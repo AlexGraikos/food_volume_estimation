@@ -142,15 +142,13 @@ def get_segment(original_image, heatmap):
     mask[mask_lightblue == 255] = 2
     mask[mask_blue == 255] = 0
 
-    # reduce noise in the edge of the image (800x600 pixels)
-    # # columns pass for noise elimination
-    # mask[1:130] = 0
-    # mask[470:600] = 0
-
-    # # rows pass for noise elimination
-    # for i in range(600):
-    #     mask[i][1:100] = 0
-    #     mask[i][700:800] = 0
+    height, width = mask.shape
+    row_filter = int(0.15 * height)
+    column_filter = int(0.15 * width)
+    mask[:row_filter, :] = 0
+    mask[-row_filter:, :] = 0
+    mask[:, :column_filter] = 0
+    mask[:, -column_filter:] = 0
 
 
     # segmentation of the food and creation of the mask to use for the histogram calculation

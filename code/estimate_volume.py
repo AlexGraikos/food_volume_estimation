@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import cv2
 import json
+from scipy.spatial.distance import pdist
+from scipy.stats import skew
 from keras.models import Model, model_from_json
 import keras.backend as K
 from custom_modules import *
@@ -124,100 +126,118 @@ class VolumeEstimator():
         object_mask = ((cv2.resize(
             object_mask, (self.model_input_shape[1],
             self.model_input_shape[0])) / 255) >= 0.5)
-        plate_mask = (np.ones((self.model_input_shape[0],
-                               self.model_input_shape[1])) - object_mask)
         # Predict depth
         img_batch = np.reshape(img, (1,) + img.shape)
         inverse_depth = self.depth_model.predict(img_batch)[0][0,:,:,0] 
         normalized_disp = (self.min_disp + (self.max_disp - self.min_disp) 
                            * inverse_depth)
         depth = self.DEPTH_RESCALING * (1 / normalized_disp)
-        # Create object and plate images/depth maps
+        # Apply mask to create object image and depth map
         object_colors = (np.tile(np.expand_dims(object_mask, axis=-1),
                                  (1,1,3)) * img)
         object_depth = object_mask * depth
-        plate_colors = (np.tile(np.expand_dims(plate_mask, axis=-1), (1,1,3)) 
-                        * img)
-        plate_depth = plate_mask * depth
 
         # Create intrinsics matrix
         intrinsics_mat = self.__create_intrinsics_matrix(
             input_image_shape, fov, focal_length)
         intrinsics_inv = np.linalg.inv(intrinsics_mat)
-        # Depth map to point cloud
+        # Convert depth map to point cloud
         depth_tensor = K.variable(np.expand_dims(depth, 0))
         intrinsics_inv_tensor = K.variable(np.expand_dims(intrinsics_inv, 0))
         point_cloud = K.eval(get_cloud(depth_tensor, intrinsics_inv_tensor))
         point_cloud_flat = np.reshape(
             point_cloud, (point_cloud.shape[1] * point_cloud.shape[2], 3))
-        # Get object and plate points by filtering zero depth pixels
+        # Get object points by filtering zero depth pixels
         object_filter = (np.reshape(
             object_depth, (object_depth.shape[0] * object_depth.shape[1]))
             > 0)
-        plate_filter = (np.reshape(
-            plate_depth, (plate_depth.shape[0] * plate_depth.shape[1])) > 0)
         object_points = point_cloud_flat[object_filter, :]
-        plate_points = point_cloud_flat[plate_filter, :]
 
-        # Estimate plane parameters and filter outlier object points
-        plane_params = ransac_plane_estimation(plate_points, k=10)
+        # Estimate plate plane parameters and filter outlier object points
+        plane_params = ransac_plane_estimation(
+            object_points, k=(0.05*object_points.shape[0]))
         object_points_filtered = sor_filter(object_points, 2, 0.7)
-        # Transform object and plane points
+        # Transform object to match z-axis with plate normal
         translation, rotation_matrix = align_plane_with_axis(
             plane_params, np.array([0, 0, 1]))
         object_points_transformed = np.dot(
             object_points_filtered + translation, rotation_matrix.T)
 
+        # Zero mean the transformed points and select the approximate 
+        # convex or concave point set as the food set
+        object_points_transformed[:,2] -= np.mean(
+            object_points_transformed[:,2])
+        over_surface_points = (
+            object_points_transformed[object_points_transformed[:,2] > 0])
+        under_surface_points = (
+            object_points_transformed[object_points_transformed[:,2] < 0])
+        # Compute skewness of distances' distribution as a measure of
+        # point connectivity (smaller distances -> more connected)
+        over_surface_dist = pdist(over_surface_points, 'euclidean')
+        over_surface_skew = skew(over_surface_dist)
+        under_surface_dist = pdist(under_surface_points, 'euclidean')
+        under_surface_skew = skew(under_surface_dist)
+
         if plot_results:
-            # Create object and plate dataFrames
-            colors_flat = np.reshape(
+            # Create all-points and object points dataFrames
+            colors_flat = (np.reshape(
                 img, (self.model_input_shape[0] * self.model_input_shape[1],
-                3))
-            object_colors_flat = colors_flat[object_filter, :] * 255
-            plate_colors_flat = colors_flat[plate_filter, :] * 255
+                3)) * 255)
+            object_colors_flat = colors_flat[object_filter, :]
+            all_points_df = pd.DataFrame(
+                np.concatenate((point_cloud_flat, colors_flat), axis=-1),
+                columns=['x','y','z','red','green','blue'])
             object_points_df = pd.DataFrame(
                 np.concatenate((object_points, object_colors_flat), axis=-1),
                 columns=['x','y','z','red','green','blue'])
-            plate_points_df = pd.DataFrame(
-                np.concatenate((plate_points, plate_colors_flat), axis=-1),
-                columns=['x','y','z','red','green','blue'])
             # Create estimated plane points dataFrame
-            all_points = np.concatenate((object_points, plate_points), axis=0)
             plane_z = np.apply_along_axis(
                 lambda x: ((plane_params[0] + plane_params[1] * x[0]
                 + plane_params[2] * x[1]) * (-1) / plane_params[3]),
-                axis=1, arr=all_points[:,:2])
+                axis=1, arr=all_points_df.values[:,:2])
             plane_points = np.concatenate(
-                (all_points[:,:2], np.expand_dims(plane_z, axis=-1)), axis=-1)
+                (all_points_df.values[:,:2], np.expand_dims(plane_z, axis=-1)), axis=-1)
             plane_points_df = pd.DataFrame(plane_points,
                                            columns=['x','y','z'])
-            # Create transformed object and plate points dataFrames
+            # Create transformed object and plane points dataFrames
             object_points_transformed_df = pd.DataFrame(
                 object_points_transformed, columns=['x','y','z'])
             plane_points_transformed = np.dot(plane_points + translation, 
                                               rotation_matrix.T)
             plane_points_transformed_df = pd.DataFrame(
                 plane_points_transformed, columns=['x','y','z'])
-            # Estimate volume
-            estimated_volume, simplices = estimate_volume(
-                object_points_transformed)
             print('[*] Estimated plane parameters (w0,w1,w2,w3):',
                   plane_params)
+
+            # Estimate volume
+            if over_surface_skew > under_surface_skew:
+                print('[*] Concave plate found.')
+                food_points = over_surface_points
+                estimated_volume, simplices = pc_to_volume(
+                    over_surface_points)
+            else:
+                print('[*] Convex plate found.')
+                food_points = under_surface_points
+                estimated_volume, simplices = pc_to_volume(
+                    under_surface_points)
+            food_points_df = pd.DataFrame(food_points, columns=['x','y','z'])
             print('[*] Estimated volume:', estimated_volume * 1000, 'L')
 
             # Plot input image and predicted segmentation mask/depth
-            pretty_plotting([img, depth, object_colors, object_depth,
-                             plate_colors, plate_depth], (3,2),
+            pretty_plotting([img, depth, object_colors, object_depth], (2,2),
                             ['Input Image', 'Depth', 'Object Mask',
-                             'Object Depth', 'Plate Mask', 'Plate Depth'])
+                             'Object Depth'])
             plt.show()
 
-            return (estimated_volume, object_points_df, plate_points_df,
+            return (estimated_volume, object_points_df, all_points_df,
                     plane_points_df, object_points_transformed_df,
-                    plane_points_transformed_df, simplices)
+                    plane_points_transformed_df, food_points_df, simplices)
         else:
             # Estimate volume
-            estimated_volume, _ = estimate_volume(object_points_transformed)
+            if over_surface_skew > under_surface_skew:
+                estimated_volume, _ = pc_to_volume(over_surface_points)
+            else:
+                estimated_volume, _ = pc_to_volume(under_surface_points)
             return estimated_volume
 
 

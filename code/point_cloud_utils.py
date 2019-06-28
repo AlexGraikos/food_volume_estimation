@@ -78,7 +78,7 @@ def sor_filter(points, z_max=1, inlier_ratio=0.5):
     return inliers 
 
 
-def estimate_volume(points):
+def pc_to_volume(points):
     """
     Estimate point cloud volume using z-axis as height.
         Inputs:
@@ -94,10 +94,10 @@ def estimate_volume(points):
     side_a = tri_vertices[:,1,:2] - tri_vertices[:,0,:2]
     side_b = tri_vertices[:,2,:2] - tri_vertices[:,0,:2]
     area = 0.5 * np.abs(np.cross(side_a, side_b, axis=1))
-    mean_height = np.mean(tri_vertices[:,:,2], axis=-1)
+    mean_height = np.abs(np.mean(tri_vertices[:,:,2], axis=-1))
     # Estimate volume as the sum of all triangulated region volumes
     volumes = area * mean_height
-    total_volume = np.abs(np.sum(volumes))
+    total_volume = np.sum(volumes)
     simplices = tri.simplices.copy()
     return total_volume, simplices
 
@@ -118,5 +118,6 @@ def pretty_plotting(imgs, tiling, titles):
         plt.subplot(rows + cols + str(r + 1))
         plt.title(titles[r])
         plt.imshow(imgs[r])
-        plt.colorbar()
+        if ('Depth' in titles[r]) or ('depth' in titles[r]):
+            plt.colorbar()
 

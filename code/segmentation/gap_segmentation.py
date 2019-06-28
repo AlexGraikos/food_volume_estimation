@@ -143,8 +143,8 @@ def get_segment(original_image, heatmap):
     mask[mask_blue == 255] = 0
 
     height, width = mask.shape
-    row_filter = int(0.1 * height)
-    column_filter = int(0.1 * width)
+    row_filter = int(0.15 * height)
+    column_filter = int(0.15 * width)
     mask[:row_filter, :] = 0
     mask[-row_filter:, :] = 0
     mask[:, :column_filter] = 0
