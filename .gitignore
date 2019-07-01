@@ -16,10 +16,10 @@ assets/volume_tests/*
 *.h5
 *.hdf5
 
-# Filetypes to NOT ignore
+# Files to NOT ignore
 !*.gitkeep
 !datasets/EPIC_KITCHENS_2018/config.json
 !datasets/EPIC_KITCHENS_2018/data_sources
 !jupyter/visualize_volume_estimation.ipynb
+!tex/readme.pdf
 
-# Extras
