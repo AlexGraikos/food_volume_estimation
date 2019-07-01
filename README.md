@@ -112,7 +112,7 @@ Download links for the pre-trained models:
 
 ## Todo
 - [x] Trained low-res model (224x128 inputs) and achieved promising results.
-- [X] Train the high-res model (448x256 inputs). No obvious advantages observed.
+- [X] Trained the high-res model (448x256 inputs). No obvious advantages observed.
 - [ ] Calibrate depth predictions.
 - [ ] Fitting volume primitives based on food detection could improve volume estimation.
 
