@@ -61,7 +61,7 @@ The triplet-defining dataFrame can be created using the ```data_utils.py``` scri
 ```
 data_utils.py --create_set_df --data_source data_sources --save_target df.csv --stride S
 ```
-where the ```data_sources file``` contains the directories in which the images are saved. For example:
+where the ```data_sources``` file contains the directories in which the images are saved. For example:
 ```
 /home/usr/food_volume_estimation/datasets/EPIC_KITCHENS_2018/frames/rgb/train/P01/P03_3/
 /home/usr/food_volume_estimation/datasets/EPIC_KITCHENS_2018/frames/rgb/train/P01/P05_1/
