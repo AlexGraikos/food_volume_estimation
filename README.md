@@ -21,11 +21,12 @@ The code is written and tested in ```python 3.6 ```. The required pip packages f
 numpy==1.16.3
 pandas=0.24.2
 opencv-python==4.1.0.25
+scipy==1.2.1
 scikit-learn==0.21.1
 tensorflow==1.13.1
 keras==2.2.4
 h5py==2.9.0
-matplotlib==.0.3
+matplotlib==3.0.3
 ```
 To train the model you also need ```image-classifiers==0.2.1``` for importing the required Resnet18 model and weights.
 
