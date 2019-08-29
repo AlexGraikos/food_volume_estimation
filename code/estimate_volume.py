@@ -162,21 +162,9 @@ class VolumeEstimator():
             plane_params, np.array([0, 0, 1]))
         object_points_transformed = np.dot(
             object_points_filtered + translation, rotation_matrix.T)
-
-        # Zero mean the transformed points and select the approximate 
-        # convex or concave point set as the food set
-        object_points_transformed[:,2] -= np.mean(
-            object_points_transformed[:,2])
-        over_surface_points = (
-            object_points_transformed[object_points_transformed[:,2] > 0])
-        under_surface_points = (
-            object_points_transformed[object_points_transformed[:,2] < 0])
-        # Compute skewness of distances' distribution as a measure of
-        # point connectivity (smaller distances -> more connected)
-        over_surface_dist = pdist(over_surface_points, 'euclidean')
-        over_surface_skew = skew(over_surface_dist)
-        under_surface_dist = pdist(under_surface_points, 'euclidean')
-        under_surface_skew = skew(under_surface_dist)
+        # Move all object points above the estimated plane
+        object_points_transformed[:,2] += np.abs(np.min(
+            object_points_transformed[:,2]))
 
         if plot_results:
             # Create all-points and object points dataFrames
@@ -210,17 +198,8 @@ class VolumeEstimator():
                   plane_params)
 
             # Estimate volume
-            if over_surface_skew > under_surface_skew:
-                print('[*] Concave plate found.')
-                food_points = over_surface_points
-                estimated_volume, simplices = pc_to_volume(
-                    over_surface_points)
-            else:
-                print('[*] Convex plate found.')
-                food_points = under_surface_points
-                estimated_volume, simplices = pc_to_volume(
-                    under_surface_points)
-            food_points_df = pd.DataFrame(food_points, columns=['x','y','z'])
+            estimated_volume, simplices = pc_to_volume(
+                object_points_transformed)
             print('[*] Estimated volume:', estimated_volume * 1000, 'L')
 
             # Plot input image and predicted segmentation mask/depth
@@ -231,13 +210,10 @@ class VolumeEstimator():
 
             return (estimated_volume, object_points_df, all_points_df,
                     plane_points_df, object_points_transformed_df,
-                    plane_points_transformed_df, food_points_df, simplices)
+                    plane_points_transformed_df, simplices)
         else:
             # Estimate volume
-            if over_surface_skew > under_surface_skew:
-                estimated_volume, _ = pc_to_volume(over_surface_points)
-            else:
-                estimated_volume, _ = pc_to_volume(under_surface_points)
+            estimated_volume, _ = pc_to_volume(object_points_transformed)
             return estimated_volume
 
 
