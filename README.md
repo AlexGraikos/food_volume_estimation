@@ -118,11 +118,11 @@ Download links for the pre-trained models:
 
 Low-res model examples:
 
-Example 1: Estimated volume 0.30L | Example 2: Estimated volume 0.66L
+Example 1:| Example 2:
 ------------ | -------------
 ![Example 1](/assets/readme_assets/test_1_depth.png) | ![Example 2](/assets/readme_assets/test_2_depth.png)
 
-Example 3: Estimated volume 0.28L | Example 4: Estimated volume 1.21L
+Example 3: | Example 4:
 ------------ | -------------
 ![Example 3](/assets/readme_assets/test_3_depth.png) | ![Example 4](/assets/readme_assets/test_4_depth.png)
 
