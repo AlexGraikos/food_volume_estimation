@@ -110,20 +110,32 @@ Download links for the pre-trained models:
   - Weights: https://drive.google.com/open?id=1mFvc20GbzUGyo9xl401BNxGNSLiKEewr
 
 
-## Todo
-- [x] Trained low-res model (224x128 inputs) and achieved promising results.
-- [X] Trained the high-res model (448x256 inputs). No obvious advantages observed.
-- [ ] Calibrate depth predictions.
-- [ ] Fitting volume primitives based on food detection could improve volume estimation.
+## Known Issues and Improvements
+A list of observed issues along with proposed improvements is given below:
+- The content of the training frames revolves around the general kitchen environment and not specifically
+food. Thus the granularity of the estimated depth on food surfaces is not as fine as the target objective
+requires, leading to rougher volume estimations. To solve this problem, the depth estimation network
+should be trained using videos focusing on food. However, food video datasets such as PFID have no
+camera motion (e.g., the food is placed on a rotating platter and the camera is stationary), which is
+critical to providing the network with a training signal.
+- The depth network generates depth values corresponding to the scene depth range of the training frames.
+In order to correctly estimate the depth of an input image, with a different depth range than the one
+seen during training, the network output must be rescaled. In this implementation, the rescaling is done
+manually by multiplying the output with an approximation of the input median depth. Adding scenes with
+various scene depth ranges to the training dataset, could help in achieving this generalization property.
+- The point cloud to volume algorithm finds a base plane on which the food is placed upon and calculates
+the volume contained between the plane and food surfaces. The fitted plane does not always match the
+actual plate, impairing the volume estimation. A potential improvement would be to fit pre-defined shapes
+on the generated point clou
 
-Low-res model examples:
+Depth prediction examples:
 
-Example 1: Estimated volume 0.30L | Example 2: Estimated volume 0.66L
+Example 1: | Example 2:
 ------------ | -------------
-![Example 1](/assets/readme_assets/test_1_depth.png) | ![Example 2](/assets/readme_assets/test_2_depth.png)
+![Example 1](/assets/readme_assets/examples/close_example_1.png) | ![Example 2](/assets/readme_assets/examples/close_example_4.png)
 
-Example 3: Estimated volume 0.28L | Example 4: Estimated volume 1.21L
+Example 3: | Example 4:
 ------------ | -------------
-![Example 3](/assets/readme_assets/test_3_depth.png) | ![Example 4](/assets/readme_assets/test_4_depth.png)
+![Example 3](/assets/readme_assets/examples/medium_example_1.png) | ![Example 4](/assets/readme_assets/examples/far_example_1.png)
 
 
