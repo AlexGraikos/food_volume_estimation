@@ -23,7 +23,7 @@ class VolumeEstimator():
         Load depth model and segmentation module.
         """
         if not arg_init:
-            # For usage in ipython
+            # For usage in jupyter notebook 
             print('[*] VolumeEstimator not initialized.')
         else:    
             self.args = self.__parse_args()
@@ -47,7 +47,7 @@ class VolumeEstimator():
                                      name='depth_model')
             print('[*] Loaded depth estimation model.')
             # Depth model configuration
-            self.DEPTH_RESCALING = self.args.depth_rescaling
+            self.GT_DEPTH_SCALE = self.args.gt_depth_scale
             self.min_disp = 1 / self.args.max_depth
             self.max_disp = 1 / self.args.min_depth
 
@@ -85,8 +85,8 @@ class VolumeEstimator():
         parser.add_argument('--focal_length', type=float,
                             help='Camera focal length (in px).',
                             default=None)
-        parser.add_argument('--depth_rescaling', type=float,
-                            help='Depth rescaling factor.',
+        parser.add_argument('--gt_depth_scale', type=float,
+                            help='Ground truth depth rescaling factor.',
                             default=1)
         parser.add_argument('--min_depth', type=float,
                             help='Minimum depth value.',
@@ -129,9 +129,11 @@ class VolumeEstimator():
         # Predict depth
         img_batch = np.reshape(img, (1,) + img.shape)
         inverse_depth = self.depth_model.predict(img_batch)[0][0,:,:,0] 
-        normalized_disp = (self.min_disp + (self.max_disp - self.min_disp) 
+        disparity_map = (self.min_disp + (self.max_disp - self.min_disp) 
                            * inverse_depth)
-        depth = self.DEPTH_RESCALING * (1 / normalized_disp)
+        predicted_median_depth = np.median(1 / disparity_map)
+        depth = ((self.GT_DEPTH_SCALE / predicted_median_depth) 
+                 * (1 / disparity_map))
         # Apply mask to create object image and depth map
         object_colors = (np.tile(np.expand_dims(object_mask, axis=-1),
                                  (1,1,3)) * img)
