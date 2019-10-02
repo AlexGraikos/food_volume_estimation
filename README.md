@@ -4,12 +4,17 @@ Using monocular depth estimation to estimate food volume in an input image.
 
 ## Method
 #### Depth Network Training
-A monocular depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf) . The sequences used for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes many hours of egocentric, food handling videos. 
+A depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf). The sequences used for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes more than fifty hours of egocentric, food handling videos.
 
 ![Depth Network Training](/assets/readme_assets/depth_train.png)
 
 #### Volume Estimation
-The food input image is passed through the trained depth network and segmentation module to predict the depth map and food object mask. These outputs, along with the camera intrinsics, generate a point cloud on which the volume estimation is perfomed.
+The food input image is passed through the trained depth network and segmentation module to predict the
+depth map and food object mask. These outputs, along with the camera intrinsics, generate a point cloud on
+which the volume estimation is perfomed. When using images that depict a general kitchen scene, the food
+segmentation module may also include the plate in the segmentation mask. In such cases, the point cloud to
+volume algorithm can compensate the added error by using only an approximated filled portion of the whole
+plate, to avoid overestimating the food volume [plate_correction branch].
 
 ![Volume Estimation](/assets/readme_assets/vol_est.png)
 
