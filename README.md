@@ -128,7 +128,11 @@ the volume contained between the plane and food surfaces. The fitted plane does 
 actual plate, impairing the volume estimation. A potential improvement would be to fit pre-defined shapes
 on the generated point clou
 
+<<<<<<< HEAD
 ## Depth prediction examples:
+=======
+Depth prediction examples:
+>>>>>>> 95790b24ca3596d7bbbf816826b93477ef7dcd10
 
 Example 1: | Example 2:
 ------------ | -------------
