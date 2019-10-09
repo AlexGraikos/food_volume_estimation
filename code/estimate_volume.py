@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import cv2
 import json
+from scipy.spatial.distance import pdist
+from scipy.stats import skew
 from keras.models import Model, model_from_json
 import keras.backend as K
 from custom_modules import *
@@ -100,7 +102,7 @@ class VolumeEstimator():
 
 
     def estimate_volume(self, input_image, fov=None, focal_length=None, 
-            plot_results=False):
+            segmentation_method='normal', plot_results=False):
         """
         Volume estimation pipeline.
             Inputs:
@@ -120,7 +122,8 @@ class VolumeEstimator():
 
         # Predict segmentation mask
         object_mask = self.food_segmentation(
-            input_image, self.segmentation_weights)
+            input_image, self.segmentation_weights, 
+            segmentation_method=segmentation_method)
         object_mask = ((cv2.resize(
             object_mask, (self.model_input_shape[1],
             self.model_input_shape[0])) / 255) >= 0.5)
@@ -162,9 +165,37 @@ class VolumeEstimator():
             plane_params, np.array([0, 0, 1]))
         object_points_transformed = np.dot(
             object_points_filtered + translation, rotation_matrix.T)
+        '''
         # Move all object points above the estimated plane
         object_points_transformed[:,2] += np.abs(np.min(
             object_points_transformed[:,2]))
+        '''
+
+        # Zero mean the transformed points and select the over and
+        # under surface points
+        object_points_transformed[:,2] -= np.mean(
+            object_points_transformed[:,2])
+        over_surface_points = (
+            object_points_transformed[object_points_transformed[:,2] > 0])
+        under_surface_points = (
+            object_points_transformed[object_points_transformed[:,2] < 0])
+        # Compute skewness of distances' distribution as a measure of
+        # point connectivity (smaller distances -> more connected)
+        over_surface_dist = pdist(over_surface_points, 'euclidean')
+        over_surface_skew = skew(over_surface_dist)
+        under_surface_dist = pdist(under_surface_points, 'euclidean')
+        under_surface_skew = skew(under_surface_dist)
+        # Determine if the food surface is concave or convex and set
+        # the plate base accordingly
+        if over_surface_skew > under_surface_skew:
+            print('[*] Concave food surface')
+            object_points_transformed[:,2] += np.abs(np.min(
+                object_points_transformed[:,2]))
+        else:
+            print('[*] Convex food surface')
+            object_points_transformed[:,2] -= np.abs(np.max(
+                object_points_transformed[:,2]))
+            
 
         if plot_results:
             # Create all-points and object points dataFrames

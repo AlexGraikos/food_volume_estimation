@@ -268,8 +268,7 @@ def get_segment_tight(original_image, heatmap):
     return segment, mask_hist
 
 
-
-def get_food_segmentation(image_path, weights_path):
+def get_food_segmentation(image_path, weights_path, segmentation_method='normal'):
     # initialization of the model
     shape = (224, 224, 3)
     dropout=0.5
@@ -290,9 +289,16 @@ def get_food_segmentation(image_path, weights_path):
     heatmap, superimposed_img = plot_cam3(original_image, cam)
 
     # get a normal segment of the food along with its binary mask + visualization
-    segmented_food, mask = get_segment(original_image, heatmap)
-    return mask
+    if segmentation_method == 'normal':
+        segmented_food, mask = get_segment(original_image, heatmap)
+    elif segmentation_method == 'tight':
+        segmented_food, mask = get_segment_tight(original_image, heatmap)
+    elif segmentation_method == 'loose':
+        segmented_food, mask = get_segment_loose(original_image, heatmap)
+    else:
+        print('[!] Invalid segmentation method')
 
+    return mask
 
 
 if __name__ == '__main__':
