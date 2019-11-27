@@ -1,13 +1,12 @@
 # Directories to ignore
 code/trained_models/*
-datasets/EPIC_KITCHENS_2018/*
-datasets/KITTI/*
-datasets/PFID_Stereo_Images/*
+datasets/*
 results/*
 tests/*
 jupyter/*
 tex/*
 assets/volume_tests/*
+deprecated/*
 
 # Filetypes to ignore
 *.pyc
@@ -18,8 +17,6 @@ assets/volume_tests/*
 
 # Files to NOT ignore
 !*.gitkeep
-!datasets/EPIC_KITCHENS_2018/config.json
-!datasets/EPIC_KITCHENS_2018/data_sources
 !jupyter/visualize_volume_estimation.ipynb
 !tex/readme.pdf
 
