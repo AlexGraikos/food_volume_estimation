@@ -6,24 +6,16 @@ from sklearn import linear_model
 import matplotlib.pyplot as plt
 
 
-def ransac_plane_estimation(points, k=10):
+def ransac_plane_estimation(points):
     """
     Estimate plane that fits the input points best, using RANSAC.
         Inputs:
             points: Input points [n,x,y,z].
-            k: Number of nearest neighbors to use for residual threshold
-               calculation.
         Outputs:
             params: Plane parameters (w0,w1,w2,w3).
     """
-    # Find mean k-neighbor distance to use as residual threshold
-    kdtree = cKDTree(points)
-    distances, _ = kdtree.query(points, k+1)
-    mean_distances = np.mean(distances[:,1:])
     # Use ransac to estimate the plate surface parameters
-    ransac = linear_model.RANSACRegressor(
-        residual_threshold=mean_distances,
-        random_state=int(np.random.rand() * 100))
+    ransac = linear_model.RANSACRegressor()
     ransac.fit(points[:,:2], points[:,2:])
     params = (ransac.estimator_.intercept_.tolist() 
               + ransac.estimator_.coef_[0].tolist() + [-1])
@@ -73,9 +65,9 @@ def sor_filter(points, z_max=1, inlier_ratio=0.5):
     distances, _ = kdtree.query(points, k)
     z_scores = zscore(np.max(distances, axis=1))
     # Filter out points outside given z-score range
-    sor_filter = np.abs(z_scores) < z_max
-    inliers = points[sor_filter]
-    return inliers 
+    sor_mask = np.abs(z_scores) < z_max
+    inliers = points[sor_mask]
+    return inliers, sor_mask
 
 
 def pc_to_volume(points):
@@ -87,6 +79,9 @@ def pc_to_volume(points):
             total_volume: Estimated volume.
             simplices: Triangulation resulting vertices.
     """
+    # Filter out points under the x-y plane
+    points_mask = points[:,2] >= 0
+    points = points[points_mask]
     # Generate triangulation of x-y plane
     tri = Delaunay(points[:,:2])
     tri_vertices = points[tri.simplices, :]

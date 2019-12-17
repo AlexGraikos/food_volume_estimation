@@ -92,5 +92,4 @@ if __name__ == '__main__':
     # Create segmentator object
     seg_model = FoodSegmentator(args.weights) 
     # Infer segmentation masks and plot results
-    #seg_model.infer_and_plot(args.images)
-    seg_model.infer_masks(args.images[0])
+    seg_model.infer_and_plot(args.images)
