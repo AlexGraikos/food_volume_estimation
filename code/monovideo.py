@@ -195,7 +195,7 @@ class MonovideoModel:
                 logs: Training logs.
         """
         if (epoch + 1) % self.args.save_per == 0:
-            postfix = '_epoch_' + str(epoch + 1)
+            postfix = '_epoch_' + '{}'.format(epoch + 1)
             self.save_model(self.monovideo, self.model_name, 'weights',
                             postfix)
 
