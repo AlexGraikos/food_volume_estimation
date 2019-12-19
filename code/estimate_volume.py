@@ -21,7 +21,8 @@ import matplotlib.pyplot as plt
 #            similar to finding the convex hull.
 #         b) Find a way to use ransac to estimate a plate plane and calculate
 #            volume according to that. Using non-object points has issues.
-#       - Clean up all code. Lots of cleanup.
+#       - Add tensorboard logging to depth estimation model training.
+#       - Clean up a bit more.
 
 
 class VolumeEstimator():
