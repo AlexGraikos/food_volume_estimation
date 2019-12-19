@@ -1,3 +1,6 @@
+import sys
+sys.path.append('depth_estimation/')
+sys.path.append('segmentation/food/')
 import argparse
 import numpy as np
 import pandas as pd
@@ -7,23 +10,25 @@ from scipy.spatial.distance import pdist
 from scipy.stats import skew
 from keras.models import Model, model_from_json
 import keras.backend as K
-from mask_rcnn_segmentation import FoodSegmentator
+from food_segmentator import FoodSegmentator
 from custom_modules import *
 from project import *
 from point_cloud_utils import *
 import matplotlib.pyplot as plt
 
 # TODO: - Decide on the plane estimation. Options are:
-#         a) Use ransac (or simple linear regression) on food points and then
-#            correct. This is similar to finding the convex hull.
+#         a) Use linear regression on food points and then adjust. This is
+#            similar to finding the convex hull.
 #         b) Find a way to use ransac to estimate a plate plane and calculate
 #            volume according to that. Using non-object points has issues.
-#       - Clean up all code. Lots of cleanup. pc_to_volume shouldn't really
-#         have the point filtering. Better if it's done outside the function.
+#       - Clean up all code. Lots of cleanup.
+
 
 class VolumeEstimator():
+    """Volume estimator object."""
     def __init__(self, arg_init=True):
         """Load depth model and create segmentator object.
+
         Inputs:
             arg_init: Flag to initialize volume estimator with 
                 command-line arguments.
@@ -54,15 +59,19 @@ class VolumeEstimator():
                                      name='depth_model')
             print('[*] Loaded depth estimation model.')
             # Depth model configuration
-            self.GT_DEPTH_SCALE = self.args.gt_depth_scale
+            self.gt_depth_scale = self.args.gt_depth_scale
             self.min_disp = 1 / self.args.max_depth
             self.max_disp = 1 / self.args.min_depth
 
             # Create segmentator object
             self.segmentator = FoodSegmentator(self.args.segmentation_weights)
 
+            # Plate adjustment relaxation parameter
+            self.relax_param = self.args.relaxation_param
+
     def __parse_args(self):
         """Parse command-line input arguments.
+
         Returns:
             args: The arguments object.
         """
@@ -106,6 +115,10 @@ class VolumeEstimator():
                             help='Maximum depth value.',
                             metavar='<max_depth>',
                             default=10)
+        parser.add_argument('--relaxation_param', type=float,
+                            help='Plate adjustment relaxation parameter.',
+                            metavar='<relaxation_param>',
+                            default=0.01)
         parser.add_argument('--plot_results', action='store_true',
                             help='Plot volume estimation results.',
                             default=False)
@@ -118,6 +131,7 @@ class VolumeEstimator():
 
     def estimate_volume(self, input_image, fov, focal_length, plot_results):
         """Volume estimation procedure.
+
         Inputs:
             input_image: Path to input image.
             fov: Camera Field of View.
@@ -144,7 +158,7 @@ class VolumeEstimator():
         disparity_map = (self.min_disp + (self.max_disp - self.min_disp) 
                            * inverse_depth)
         predicted_median_depth = np.median(1 / disparity_map)
-        depth = ((self.GT_DEPTH_SCALE / predicted_median_depth) 
+        depth = ((self.gt_depth_scale / predicted_median_depth) 
                  * (1 / disparity_map))
         # Convert depth map to point cloud
         depth_tensor = K.variable(np.expand_dims(depth, 0))
@@ -177,7 +191,7 @@ class VolumeEstimator():
             non_object_points = point_cloud_flat[np.logical_not(object_mask), :]
 
             # Estimate plate plane parameters
-            plane_params = ransac_plane_estimation(object_points)
+            plane_params = plane_estimation(object_points)
             # Filter outlier points
             object_points_filtered, sor_mask = sor_filter(
                 object_points, 2, 0.7)
@@ -205,25 +219,27 @@ class VolumeEstimator():
             under_surface_skew = skew(under_surface_dist)
 
             # Use skewness measure to determine if the food surface is 
-            # concave or convex and ...
+            # concave or convex and adjust to plate surface accordingly
             if over_surface_skew > under_surface_skew:
                 print('[*] Concave food surface')
+                # Place plate surface underneath the food object
                 distance_hist, bins = np.histogram(
-                    object_points_transformed[:,2], bins=10)
+                    object_points_transformed[:,2], bins=15)
                 distance_density = distance_hist / np.sum(distance_hist)
                 cum_density = np.cumsum(distance_density)
                 z_adj_indx = next(x for x, val in enumerate(cum_density) 
-                                  if val > 0.05)
+                                  if val > self.relax_param)
                 z_adj = (bins[z_adj_indx] + bins[z_adj_indx+1]) / 2
                 object_points_transformed[:,2] += np.abs(z_adj)
             else:
                 print('[*] Convex food surface')
+                # Place plate surface above the food object
                 distance_hist, bins = np.histogram(
-                    object_points_transformed[:,2], bins=10)
+                    object_points_transformed[:,2], bins=15)
                 distance_density = distance_hist / np.sum(distance_hist)
                 cum_density = np.cumsum(distance_density)
                 z_adj_indx = next(x for x, val in enumerate(cum_density) 
-                                  if val > 0.95)
+                                  if val > (1 - self.relax_param))
                 z_adj = (bins[z_adj_indx] + bins[z_adj_indx+1]) / 2
                 object_points_transformed[:,2] -= np.abs(z_adj)
                 
@@ -267,9 +283,10 @@ class VolumeEstimator():
                 plane_points_transformed_df = pd.DataFrame(
                     plane_points_transformed, columns=['x','y','z'])
 
-                # Estimate volume
-                estimated_volume, simplices = pc_to_volume(
-                    object_points_transformed)
+                # Estimate volume for points above the plate
+                volume_points = object_points_transformed[
+                    object_points_transformed[:,2] > 0]
+                estimated_volume, simplices = pc_to_volume(volume_points)
                 print('[*] Estimated volume:', estimated_volume * 1000, 'L')
 
                 # Plot input image and predicted segmentation mask/depth
@@ -284,8 +301,10 @@ class VolumeEstimator():
                      plane_points_df, object_points_transformed_df,
                      plane_points_transformed_df, simplices))
             else:
-                # Estimate volume
-                estimated_volume, _ = pc_to_volume(object_points_transformed)
+                # Estimate volume for points above the plate
+                volume_points = object_points_transformed[
+                    object_points_transformed[:,2] > 0]
+                estimated_volume, _ = pc_to_volume(volume_points)
                 estimated_volumes.append(estimated_volume)
 
         return estimated_volumes
@@ -293,6 +312,7 @@ class VolumeEstimator():
     def __create_intrinsics_matrix(self, input_image_shape, fov,
             focal_length):
         """Create intrinsics matrix from given camera parameters.
+
         Inputs:
             input_image_shape: Original input image shape.
             fov: Camera Field of View (in deg).
@@ -319,6 +339,7 @@ class VolumeEstimator():
 
     def __set_weights_trainable(self, model, trainable):
         """Sets model weights to trainable/non-trainable.
+
         Inputs:
             model: Model to set weights.
             trainable: Trainability flag.

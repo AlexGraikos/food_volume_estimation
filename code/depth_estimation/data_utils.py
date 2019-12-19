@@ -10,12 +10,11 @@ class DataUtils():
         self.args = self.parse_args()
         self.FLOW_THRESHOLD = 1
 
-
     def parse_args(self):
-        """
-        Parses command-line input arguments.
-            Outputs:
-                args: The arguments object.
+        """Parses command-line input arguments.
+
+        Outputs:
+            args: The arguments object.
         """
         # Parse command line arguments
         parser = argparse.ArgumentParser(
@@ -53,16 +52,15 @@ class DataUtils():
         args = parser.parse_args()
         return args
 
-
     def create_directory_dataframe(self, directory, df_file, stride=1):
-        """
-        Creates a sequence dataFrame from a directory of frames.
+        """Creates a sequence dataFrame from a directory of frames.
         The dataFrame is saved in df_file (csv format).
         The created dataFrame has columns [curr_frame, prev_frame, next_frame].
-            Inputs:
-                directory: Directory containing frames composing
-                           the target set.
-                df_file: The target file to save the dataFrame (.csv).
+
+        Inputs:
+            directory: Directory containing frames composing
+                       the target set.
+            df_file: The target file to save the dataFrame (.csv).
         """
 
         # Concat all and save
@@ -72,19 +70,18 @@ class DataUtils():
         print('[*] Finished creating set dataFrame and saved in',
               '"' + os.path.abspath(df_file) + '"')
  
-
     def create_set_dataframe(self, data_source_file, df_file, stride=1):
-        """
-        Creates a sequence dataFrame that describes a set of images
+        """Creates a sequence dataFrame that describes a set of images
         defined in data_source_file.
         The dataFrame is saved in df_file (csv format).
         The created dataFrame has columns [curr_frame, prev_frame, next_frame].
-            Inputs:
-                data_source_file: File defining image directories that 
-                                  compose the target set.
-                df_file: The target file to save the dataFrame (.csv).
-                stride: Distance between frames.
-                        [prev <-stride-> curr <-stride-> next]
+
+        Inputs:
+            data_source_file: File defining image directories that 
+                              compose the target set.
+            df_file: The target file to save the dataFrame (.csv).
+            stride: Distance between frames.
+                    [prev <-stride-> curr <-stride-> next]
         """
         # Load data source directories
         data_sources = [line.rstrip('\n') 
@@ -107,18 +104,17 @@ class DataUtils():
         print('[*] Finished creating set dataFrame and saved in',
               '"' + os.path.abspath(df_file) + '"')
 
-
     def __create_sequence_dataframe(self, img_directory, stride=1):
-        """
-        Creates a frame sequence dataFrame from images in given directory.
+        """Creates a frame sequence dataFrame from images in given directory.
         The created dataFrame has columns [curr_frame, prev_frame, next_frame].
-            Inputs:
-                img_directory: The directory for which to create 
-                               the sequence dataframe.
-                stride: Distance between frames.
-                        [prev <-stride-> curr <-stride-> next]
-            Outputs:
-                sequence_df: The image sequence dataFrame.
+
+        Inputs:
+            img_directory: The directory for which to create 
+                           the sequence dataframe.
+            stride: Distance between frames.
+                    [prev <-stride-> curr <-stride-> next]
+        Outputs:
+            sequence_df: The image sequence dataFrame.
         """
         image_files = [os.path.join(img_directory, f) 
                        for f in os.listdir(img_directory)
@@ -138,22 +134,21 @@ class DataUtils():
                                             'next_frame'])
         return sequence_df
 
-
     def create_EPIC_set(self, data_source_file, target_dir, target_size,
             stride, interpolation):
-        """
-        Creates a set of EPIC-kitchens dataset images from source
+        """Creates a set of EPIC-kitchens dataset images from source
         directories defined in data_source_file.
         The set is filtered by ignoring images with mean optical flow < 1.
         The set is saved at target_dir with target_size image sizes.
-            Inputs:
-                data_source_file: File defining image directories 
-                                  that compose the target set.
-                target_dir: The target directory to save the set.
-                target_size: Target image size.
-                stride: Frame loading stride. For EPIC-kitchens the default=2.
-                interpolation: Interpolation method.
-                               [nearest (default)/bilinear/cubic]
+
+        Inputs:
+            data_source_file: File defining image directories 
+                              that compose the target set.
+            target_dir: The target directory to save the set.
+            target_size: Target image size.
+            stride: Frame loading stride. For EPIC-kitchens the default=2.
+            interpolation: Interpolation method.
+                           [nearest (default)/bilinear/cubic]
         """
         # Load data source directories
         data_sources = [line.rstrip('\n') 

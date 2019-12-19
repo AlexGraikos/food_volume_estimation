@@ -11,9 +11,7 @@ from custom_modules import *
 
 class ModelTests:
     def __init__(self):
-        """"
-        Initializes general parameters and loads models.
-        """
+        """Initializes general parameters and loads models."""
         self.args = self.parse_args()
         # Load testing parameters 
         with open(self.args.config, 'r') as read_file:
@@ -44,12 +42,11 @@ class ModelTests:
                     model_architecture_json, custom_objects=objs)
         self.monovideo.load_weights(self.args.model_weights)
 
-
     def parse_args(self):
-        """
-        Parses command-line input arguments.
-            Outputs:
-                args: The arguments object.
+        """Parses command-line input arguments.
+
+        Outputs:
+            args: The arguments object.
         """
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='Model testing script.')
@@ -77,12 +74,11 @@ class ModelTests:
         args = parser.parse_args()
         return args
     
-
     def infer_depth(self, n_tests):
-        """
-        Infer depth of input images using the depth estimation network.
-            Inputs:
-                n_tests: Number of inferences to perform.
+        """Infer depth of input images using the depth estimation network.
+
+        Inputs:
+            n_tests: Number of inferences to perform.
         """
         # Slice loaded model to get depth model
         depth_net = self.monovideo.get_layer('depth_net')
@@ -104,12 +100,11 @@ class ModelTests:
                                    ['Input Frame', 'Predicted Depth'])
             plt.show()
 
-
     def test_outputs(self, n_tests):
-        """
-        Plots outputs of model on input images.
-            Inputs:
-                n_tests: Number of tests to perform.
+        """Plots outputs of model on input images.
+
+        Inputs:
+            n_tests: Number of tests to perform.
         """
         # Create test data generator
         test_data_df = pd.read_csv(self.args.test_dataframe)
@@ -168,19 +163,17 @@ class ModelTests:
             self.__pretty_plotting(depths, (2,2), depth_titles)
             plt.show()
 
-
     def __set_weights_trainable(self, model, trainable):
-        """
-        Sets model weights to trainable/non-trainable.
-            Inputs:
-                model: Model to set weights.
-                trainable: Trainability flag.
+        """Sets model weights to trainable/non-trainable.
+
+        Inputs:
+            model: Model to set weights.
+            trainable: Trainability flag.
         """
         for layer in model.layers:
             layer.trainable = trainable
             if isinstance(layer, Model):
                 self.__set_weights_trainable(layer, trainable)
-
 
     def __inverse_depth_normalization(self, x):
         min_disp = 1 / self.depth_range[1]
@@ -189,14 +182,13 @@ class ModelTests:
         depth_map = 1 / normalized_disp
         return depth_map
 
-
     def __pretty_plotting(self, imgs, tiling, titles):
-        """
-        Plots images in a pretty fashion.
-            Inputs:
-                imgs: List of images to plot.
-                tiling: Subplot tiling tuple (rows,cols).
-                titles: List of subplot titles.
+        """Plots images in a pretty fashion.
+
+        Inputs:
+            imgs: List of images to plot.
+            tiling: Subplot tiling tuple (rows,cols).
+            titles: List of subplot titles.
         """
         n_plots = len(imgs)
         rows = str(tiling[0])

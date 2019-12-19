@@ -74,7 +74,6 @@ def inverse_warp(img, depth, pose_vector, intrinsic_mat, intrinsic_mat_inv):
     projected_img, mask = _spatial_transformer(img, source_pixel_coords)
     return projected_img, mask
 
-
 def get_transform_mat(egomotion_vecs, i, j):
     """Returns a transform matrix defining the transform from frame i to j."""
     egomotion_transforms = []
@@ -94,12 +93,10 @@ def get_transform_mat(egomotion_vecs, i, j):
         egomotion_mat = tf.matmul(egomotion_mat, egomotion_transforms[i])
     return egomotion_mat
 
-
 def _pixel2cam(depth, pixel_coords, intrinsic_mat_inv):
     """Transform coordinates in the pixel frame to the camera frame."""
     cam_coords = tf.matmul(intrinsic_mat_inv, pixel_coords) * depth
     return cam_coords
-
 
 def _cam2pixel(cam_coords, proj_c2p):
     """Transform coordinates in the camera frame to the pixel frame."""
@@ -112,7 +109,6 @@ def _cam2pixel(cam_coords, proj_c2p):
     y_norm = y / (z + 1e-10)
     pixel_coords = tf.concat([x_norm, y_norm], axis=1)
     return pixel_coords
-
 
 def _meshgrid_abs(height, width):
     """Meshgrid in the absolute coordinates."""
@@ -129,7 +125,6 @@ def _meshgrid_abs(height, width):
     ones = tf.ones_like(x_t_flat)
     grid = tf.concat([x_t_flat, y_t_flat, ones], axis=0)
     return grid
-
 
 def _euler2mat(z, y, x):
     """Converts euler angles to rotation matrix.
@@ -185,7 +180,6 @@ def _euler2mat(z, y, x):
 
     return tf.matmul(tf.matmul(xmat, ymat), zmat)
 
-
 def _egomotion_vec2mat(vec, batch_size):
     """Converts 6DoF transform vector to transformation matrix.
 
@@ -208,7 +202,6 @@ def _egomotion_vec2mat(vec, batch_size):
     transform_mat = tf.concat([rot_mat, translation], axis=2)
     transform_mat = tf.concat([transform_mat, filler], axis=1)
     return transform_mat
-
 
 def _bilinear_sampler(im, x, y, name='blinear_sampler'):
     """Perform bilinear sampling on im given list of x, y coordinates.
@@ -305,7 +298,6 @@ def _bilinear_sampler(im, x, y, name='blinear_sampler'):
         mask = tf.reshape(mask, tf.stack([batch_size, height, width, 1]))
         return output, mask
 
-
 def _spatial_transformer(img, coords):
     """A wrapper over binlinear_sampler(), taking absolute coords as input."""
     img_height = tf.cast(tf.shape(img)[1], tf.float32)
@@ -317,7 +309,6 @@ def _spatial_transformer(img, coords):
     py = py / (img_height - 1) * 2.0 - 1.0
     output_img, mask = _bilinear_sampler(img, px, py)
     return output_img, mask
-
 
 def get_cloud(depth, intrinsics_inv, name=None):
     """Convert depth map to 3D point cloud."""

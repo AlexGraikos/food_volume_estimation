@@ -2,8 +2,7 @@ import sys
 import os
 
 # Setup Mask-RCNN library
-MASK_RCNN_DIR = os.path.abspath(
-    '/home/alex/Projects/food_segmentation/food_instance_segmentation')
+MASK_RCNN_DIR = os.path.abspath('../')
 sys.path.append(MASK_RCNN_DIR)  # To find Mask RCNN library
 from mrcnn.config import Config
 from mrcnn import model as modellib, utils
@@ -26,10 +25,10 @@ class FoodSegConfig(Config):
     NUM_CLASSES = 1 + len(clusters)
 
 class FoodSegmentator():
-    """Food segmentator object using the Mask RCNN model.
-    """
+    """Food segmentator object using the Mask RCNN model."""
     def __init__(self, weights_path):
         """Initialize the segmentation model.
+
         Inputs:
             weights_path: Path to model weights file (.h5).
         """
@@ -42,6 +41,7 @@ class FoodSegmentator():
 
     def infer_masks(self, image_path):
         """Infer the segmentation masks in the input image.
+
         Inputs:
             image_path: Path to image to detect food in.
         Returns:
@@ -59,6 +59,7 @@ class FoodSegmentator():
 
     def infer_and_plot(self, image_paths):
         """Infer the model output on a single image and plot the results.
+
         Inputs:
             image_paths: List of paths to images to detect food in.
         """

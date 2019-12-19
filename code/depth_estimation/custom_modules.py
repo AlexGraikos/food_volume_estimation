@@ -9,9 +9,8 @@ from project import *
 
 
 class AugmentationLayer(Layer):
-    """
-    Image batch augmentation layer. Random color augmentations are applied to
-    input images during training, with given probability.
+    """Image batch augmentation layer. Random color augmentations are 
+    applied to input images during training, with given probability.
     Augmentation seeds are created to perform the same transformations
     on all three input frames for consistency.
     """
@@ -43,12 +42,12 @@ class AugmentationLayer(Layer):
         return y
         
     def __augment_inputs(self, x):
-        """
-        Input augmentation function.
-            Inputs:
-                x: Input frame triplet. 
-            Outputs:
-                aug_x: Augmented input frames.
+        """Input augmentation function.
+
+        Inputs:
+            x: Input frame triplet. 
+        Outputs:
+            aug_x: Augmented input frames.
         """
         # Unpack inputs
         curr_frame = x[0]
@@ -112,10 +111,8 @@ class AugmentationLayer(Layer):
 
 
 class ProjectionLayer(Layer):
-    """
-    Projective inverse warping layer.
-    Initialize with the camera intrinsics matrix which is kept constant
-    during training.
+    """Projective inverse warping layer. Initialize with the camera 
+    intrinsics matrix which is kept constant during training.
     """
     def __init__(self, intrinsics_mat=None, **kwargs):
         self.POSE_SCALING = 0.001
@@ -149,9 +146,8 @@ class ProjectionLayer(Layer):
 
 
 class ReflectionPadding2D(Layer):
-    """
-    Reflection padding layer.
-    Padding (p1,p2) is applied as ([p1 rows p1], [p2 cols p2]).
+    """Reflection padding layer. Padding (p1,p2) is applied as 
+    ([p1 rows p1], [p2 cols p2]).
     """
     def __init__(self, padding=(1,1), **kwargs):
         self.padding = tuple(padding)
@@ -175,8 +171,7 @@ class ReflectionPadding2D(Layer):
 
 
 class InverseDepthNormalization(Layer):
-    """
-    Normalizes and inverses disparities to create depth map with
+    """Normalizes and inverses disparities to create depth map with
     given max and min values.
     """
     def __init__(self, min_depth=0.01, max_depth=10, **kwargs):
@@ -206,14 +201,14 @@ class InverseDepthNormalization(Layer):
 
 class Losses():
     def reprojection_loss(self, alpha=0.85, masking=True):
-        """
-        Creates reprojection loss function combining MAE and SSIM losses.
+        """Creates reprojection loss function combining MAE and SSIM losses.
         The reprojection loss is computed per scale by choosing the minimum
         loss between the previous and next frame reprojections.
-            Inputs:
-                alpha: SSIM loss weight
-            Outputs:
-                reprojection_loss: Reprojection Keras-style loss function
+
+        Inputs:
+            alpha: SSIM loss weight
+        Outputs:
+            reprojection_loss: Reprojection Keras-style loss function
         """
         def reprojection_loss_keras(y_true, y_pred):
             source_loss = y_pred[:,:,:,:3]
@@ -243,10 +238,8 @@ class Losses():
 
         return reprojection_loss_keras
 
-
     def compute_source_loss(self, x, alpha=0.85):
-        """
-        Compute minimum reprojection loss using the prev and next frames
+        """Compute minimum reprojection loss using the prev and next frames
         as reprojections.
         """
         y_true = x[0]
@@ -267,10 +260,8 @@ class Losses():
                        + (1 - alpha) * source_min_mae)
         return source_loss
 
-
     def depth_smoothness(self):
-        """
-        Computes image-aware depth smoothness loss.
+        """Computes image-aware depth smoothness loss.
         Taken from:
             https://github.com/tensorflow/models/tree/master/research/struct2depth
         Modified by Alexander Graikos.
@@ -296,10 +287,8 @@ class Losses():
 
         return depth_smoothness_keras
 
-
     def __ssim(self, x, y):
-        """
-        Computes a differentiable structured image similarity measure.
+        """Computes a differentiable structured image similarity measure.
         Taken from:
             https://github.com/tensorflow/models/tree/master/research/struct2depth
         Modified by Alexander Graikos.
@@ -322,19 +311,15 @@ class Losses():
         ssim = ssim_n / ssim_d
         return K.clip((1 - ssim) / 2, 0, 1)
 
-
     def __gradient_x(self, img):
         return img[:, :, :-1, :] - img[:, :, 1:, :]
-
 
     def __gradient_y(self, img):
         return img[:, :-1, :, :] - img[:, 1:, :, :]
 
 
 class NumpyEncoder(json.JSONEncoder):
-    """
-    JSON encoder for numpy types.
-    """
+    """JSON encoder for numpy types."""
     def default(self, obj):
         if isinstance(obj, (np.int_, np.intc, np.intp, np.int8,
                             np.int16, np.int32, np.int64, np.uint8,
@@ -349,9 +334,7 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 class DataGenerator(Sequence):
-    """
-    Generates batches of frame triplets, with given size.
-    """
+    """Generates batches of frame triplets, with given size."""
     def __init__(self, data_df, height, width, batch_size, flipping):
         self.data_df = data_df
         self.target_size = (width, height)
@@ -369,13 +352,13 @@ class DataGenerator(Sequence):
         np.random.shuffle(self.data_df.values)
 
     def __read_img(self, path, flip):
-        """
-        Load input image and flip if specified.
-            Inputs:
-                path: Path to input image.
-                flip: Flipping flag.
-            Outputs:
-                img: Loaded image with pixel values [0,1].
+        """Load input image and flip if specified.
+
+        Inputs:
+            path: Path to input image.
+            flip: Flipping flag.
+        Outputs:
+            img: Loaded image with pixel values [0,1].
         """
         img = cv2.imread(path, cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -386,12 +369,12 @@ class DataGenerator(Sequence):
         return img.astype(np.float32) / 255
 
     def __getitem__(self, idx):
-        """
-        Generate and return network training data.
-            Inputs:
-                idx: Index of current batch.
-            Outputs:
-                ([inputs], [outputs]) tuple for model training.
+        """Generate and return network training data.
+        
+        Inputs:
+            idx: Index of current batch.
+        Outputs:
+            ([inputs], [outputs]) tuple for model training.
         """
         # Load file paths to current batch images
         curr_batch_fp = self.data_df.iloc[

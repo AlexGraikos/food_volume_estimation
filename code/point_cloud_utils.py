@@ -7,31 +7,47 @@ import matplotlib.pyplot as plt
 
 
 def ransac_plane_estimation(points):
+    """Find the plane that best fits the input points using 
+    linear regression RANSAC.
+
+    Inputs:
+        points: Input points [n,x,y,z].
+    Outputs:
+        params: Plane parameters (w0,w1,w2,w3).
     """
-    Estimate plane that fits the input points best, using RANSAC.
-        Inputs:
-            points: Input points [n,x,y,z].
-        Outputs:
-            params: Plane parameters (w0,w1,w2,w3).
-    """
-    # Use ransac to estimate the plate surface parameters
+    # Use ransac to estimate the plane parameters
     ransac = linear_model.RANSACRegressor()
     ransac.fit(points[:,:2], points[:,2:])
     params = (ransac.estimator_.intercept_.tolist() 
               + ransac.estimator_.coef_[0].tolist() + [-1])
     return params
 
+def plane_estimation(points):
+    """Find the plane that best fits the input points using ordinary 
+    least squares.
+
+    Inputs:
+        points: Input points [n,x,y,z].
+    Outputs:
+        params: Plane parameters (w0,w1,w2,w3).
+    """
+    # Use OLS to estimate the plane parameters
+    model = linear_model.LinearRegression()
+    model.fit(points[:,:2], points[:,2:])
+    params = (model.intercept_.tolist() 
+              + model.coef_[0].tolist() + [-1])
+    return params
 
 def align_plane_with_axis(plane_params, axis):
-    """
-    Compute translation vector and rotation matrix to align given plane
-    with axis.
-        Inputs:
-            plane_params: Plane parameters (w0,w1,w2,w3).
-            axis: Unit axis to align plane to.
-        Outputs:
-            translation_vec: Translation vector.
-            rotation_matrix: Rotation matrix.
+    """Compute the translation vector and rotation matrix to align 
+    given plane with axis.
+    
+    Inputs:
+        plane_params: Plane parameters (w0,w1,w2,w3).
+        axis: Unit axis to align plane to.
+    Outputs:
+        translation_vec: Translation vector.
+        rotation_matrix: Rotation matrix.
     """
     plane_params = np.array(plane_params)
     plane_normal = plane_params[1:] / np.sqrt(np.sum(plane_params[1:]**2))
@@ -49,14 +65,14 @@ def align_plane_with_axis(plane_params, axis):
 
 
 def sor_filter(points, z_max=1, inlier_ratio=0.5):
-    """
-    Statistical outlier filtering of point cloud data.
-        Inputs:
-            points: Input points [n,x,y,z].
-            z_max: Maximum z-score for inliers.
-            inlier_ratio: Assumption of min inliers to outliers ratio.
-        Outputs:
-            inliers: Inlier points in input set.
+    """Statistical outlier filtering of point cloud data.
+
+    Inputs:
+        points: Input points [n,x,y,z].
+        z_max: Maximum z-score for inliers.
+        inlier_ratio: Assumption of min inliers to outliers ratio.
+    Outputs:
+        inliers: Inlier points in input set.
     """
     # Find max k-neighbor distance to use as distance score
     # where k is determined by the assumed inlier to outlier ratio
@@ -71,17 +87,14 @@ def sor_filter(points, z_max=1, inlier_ratio=0.5):
 
 
 def pc_to_volume(points):
+    """Estimate point cloud volume using z-axis as height.
+
+    Inputs:
+        points: Volume-defining points.
+    Outputs:
+        total_volume: Estimated volume.
+        simplices: Triangulation resulting vertices.
     """
-    Estimate point cloud volume using z-axis as height.
-        Inputs:
-            points: Volume-defining points.
-        Outputs:
-            total_volume: Estimated volume.
-            simplices: Triangulation resulting vertices.
-    """
-    # Filter out points under the x-y plane
-    points_mask = points[:,2] >= 0
-    points = points[points_mask]
     # Generate triangulation of x-y plane
     tri = Delaunay(points[:,:2])
     tri_vertices = points[tri.simplices, :]
@@ -98,12 +111,12 @@ def pc_to_volume(points):
 
 
 def pretty_plotting(imgs, tiling, titles):
-    """
-    Plot images in a pretty grid.
-        Inputs:
-            imgs: List of images to plot.
-            tiling: Subplot tiling tuple (rows,cols).
-            titles: List of subplot titles.
+    """Plot images in a pretty grid.
+
+    Inputs:
+        imgs: List of images to plot.
+        tiling: Subplot tiling tuple (rows,cols).
+        titles: List of subplot titles.
     """
     n_plots = len(imgs)
     rows = str(tiling[0])

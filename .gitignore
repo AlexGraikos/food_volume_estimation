@@ -1,22 +1,19 @@
 # Directories to ignore
-code/trained_models/*
 datasets/*
-results/*
-tests/*
-jupyter/*
-tex/*
-assets/volume_tests/*
-deprecated/*
+models/*
+assets/*
 
 # Filetypes to ignore
 *.pyc
-*.pfm
-*.ply
 *.h5
 *.hdf5
 
 # Files to NOT ignore
-!*.gitkeep
-!jupyter/visualize_volume_estimation.ipynb
-!tex/readme.pdf
+!datasets/EPIC_KITCHENS_2018/config.json
+!datasets/EPIC_KITCHENS_2018/data_sources_example
+!datasets/food_videos_dataset/config.json
+!datasets/food_videos_dataset/data_sources_example
+!datasets/UNIMIB2016/annotations.json
+!datasets/UNIMIB2016/orient_images.sh
+!assets/readme_assets/*
 

@@ -22,13 +22,12 @@ class NetworkBuilder:
         self.depth_range = depth_range
         self.custom_losses = Losses()
 
-
     def create_monovideo(self):
-        """
-        Creates the complete monocular depth estimation model.
-            Outputs:
-                monovideo: Monocular depth estimation model, with all
-                available outputs.
+        """Creates the complete monocular depth estimation model.
+
+        Outputs:
+            monovideo: Monocular depth estimation model, with all
+            available outputs.
         """
         # Create modules
         depth_net = self.__create_depth_net()
@@ -80,12 +79,11 @@ class NetworkBuilder:
             name='monovideo')
         return monovideo 
 
-
     def __create_depth_net(self):
-        """
-        Creates the depth predicting network model.
-            Outputs:
-                depth_net: Depth predicting network model.
+        """Creates the depth predicting network model.
+
+        Outputs:
+            depth_net: Depth predicting network model.
         """
         # ResNet18 encoder
         depth_encoder = ResNet18(input_shape=self.img_shape,
@@ -136,12 +134,11 @@ class NetworkBuilder:
             name='depth_net')
         return depth_net
 
-
     def __create_pose_net(self):
-        """
-        Creates and returns the pose estimation network.
-            Outputs:
-                pose_net: Pose estimation network model.
+        """Creates and returns the pose estimation network.
+
+        Outputs:
+            pose_net: Pose estimation network model.
         """
         # Pose encoder
         pose_encoder = ResNet18(input_shape=(self.img_shape[0],
@@ -190,12 +187,11 @@ class NetworkBuilder:
             name='pose_net')
         return pose_net
 
-
     def __create_reprojection_module(self):
-        """
-        Creates and returns the reprojection module model.
-            Outputs:
-                reprojection_module: Reprojection module model.
+        """Creates and returns the reprojection module model.
+
+        Outputs:
+            reprojection_module: Reprojection module model.
         """
         # Inputs
         prev_frame = Input(shape=self.img_shape)

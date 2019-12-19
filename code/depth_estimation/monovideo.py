@@ -13,8 +13,8 @@ from networks import NetworkBuilder
 
 class MonovideoModel:
     def __init__(self):
-        """"
-        Reads command-line arguments and initializes general model parameters.
+        """Reads command-line arguments and initializes general 
+        model parameters.
         """
         self.args = self.__parse_args()
         # Load training parameters
@@ -29,12 +29,11 @@ class MonovideoModel:
         print('[*] Input image size:', self.img_shape)
         print('[*] Predicted depth range:', self.depth_range)
 
-
     def __parse_args(self):
-        """
-        Parses command-line input arguments.
-            Outputs:
-                args: The arguments object.
+        """Parses command-line input arguments.
+
+        Outputs:
+            args: The arguments object.
         """
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='Model training script.')
@@ -65,11 +64,8 @@ class MonovideoModel:
         args = parser.parse_args()
         return args
 
-
     def initialize_training(self):
-        """
-        Initializes model training.
-        """
+        """Initializes model training."""
         # Create monovideo model
         nets_builder = NetworkBuilder(self.img_shape, self.intrinsics_mat,
                                       self.depth_range)
@@ -108,14 +104,13 @@ class MonovideoModel:
         self.training_model.compile(adam_opt, loss=loss_list,
                                  loss_weights=loss_weights)
 
-
     def train(self, train_df_file, batch_size, training_epochs):
-        """
-        Trains model.
-            Inputs:
-                train_df_file: Training data dataFrame file (.csv).
-                batch_size: Training batch size.
-                training_epochs: Number of training epochs.
+        """Trains model.
+
+        Inputs:
+            train_df_file: Training data dataFrame file (.csv).
+            batch_size: Training batch size.
+            training_epochs: Number of training epochs.
         """
         # Learning rate dropping callback
         lr_callback = self.__learning_rate_dropping(
@@ -144,15 +139,14 @@ class MonovideoModel:
             print('[*] Saving training log at', 
                   '"trained_models/training_history.json".')
 
-
     def save_model(self, model, name, mode, postfix=''):
-        """
-        Saves model architecture/weights in trained_models directory.
-            Inputs:
-                model: Model to save.
-                name: Model name.
-                mode: Save either model [weights/architecture].
-                postfix: Postfix appended to model name.
+        """Saves model architecture/weights in trained_models directory.
+
+        Inputs:
+            model: Model to save.
+            name: Model name.
+            mode: Save either model [weights/architecture].
+            postfix: Postfix appended to model name.
         """
         if model is not None:
             # Create saving dir if non-existent
@@ -186,43 +180,40 @@ class MonovideoModel:
         else:
             print('[!] Model not defined.')
 
-
     def __model_checkpoint(self, epoch, logs):
-        """
-        Callback function that saves model per given period of epochs.
-            Inputs:
-                epoch: Current epoch (zero-indexed).
-                logs: Training logs.
+        """Callback function that saves model per given period of epochs.
+
+        Inputs:
+            epoch: Current epoch (zero-indexed).
+            logs: Training logs.
         """
         if (epoch + 1) % self.args.save_per == 0:
             postfix = '_epoch_' + '{}'.format(epoch + 1)
             self.save_model(self.monovideo, self.model_name, 'weights',
                             postfix)
 
-
     def __set_weights_trainable(self, model, trainable):
-        """
-        Sets model weights to trainable/non-trainable.
-            Inputs:
-                model: Model to set weights.
-                trainable: Trainability flag.
+        """Sets model weights to trainable/non-trainable.
+
+        Inputs:
+            model: Model to set weights.
+            trainable: Trainability flag.
         """
         for layer in model.layers:
             layer.trainable = trainable
             if isinstance(layer, Model):
                 self.__set_weights_trainable(layer, trainable)
     
-
     def __learning_rate_dropping(self, factor, start_epoch, period):
-        """
-        Creates callback function to reduce learning rate by given factor
+        """Creates callback function to reduce learning rate by given factor
         during training.
-            Inputs:
-                factor: Learning rate reduction factor.
-                start_epoch: First epoch to reduce learning rate at.
-                period: Learning rate reduction epoch period.
-            Outputs:
-                drop_lr: Learning rate dropping callback function.
+
+        Inputs:
+            factor: Learning rate reduction factor.
+            start_epoch: First epoch to reduce learning rate at.
+            period: Learning rate reduction epoch period.
+        Outputs:
+            drop_lr: Learning rate dropping callback function.
         """
         def drop_lr(epoch, curr_lr):
             # Epochs are zero-indexed
