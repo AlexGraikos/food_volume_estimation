@@ -1,5 +1,8 @@
 # Directories to ignore
 datasets/*
+datasets/EPIC_KITCHENS_2018/*
+datasets/food_videos_dataset/*
+datasets/UNIMIB2016/*
 models/*
 assets/*
 
@@ -9,10 +12,13 @@ assets/*
 *.hdf5
 
 # Files to NOT ignore
+!datasets/EPIC_KITCHENS_2018/
 !datasets/EPIC_KITCHENS_2018/config.json
 !datasets/EPIC_KITCHENS_2018/data_sources_example
+!datasets/food_videos_dataset/
 !datasets/food_videos_dataset/config.json
 !datasets/food_videos_dataset/data_sources_example
+!datasets/UNIMIB2016/
 !datasets/UNIMIB2016/annotations.json
 !datasets/UNIMIB2016/orient_images.sh
 !models/models_are_placed_here.md
