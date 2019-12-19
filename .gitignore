@@ -23,5 +23,5 @@ assets/*
 !datasets/UNIMIB2016/orient_images.sh
 !models/models_are_placed_here.md
 !assets/assets_are_placed_here.md
-!assets/readme_assets/*
+!assets/readme_assets/
 
