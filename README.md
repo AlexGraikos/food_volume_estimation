@@ -1,26 +1,24 @@
 # Food volume estimation
-Using monocular depth estimation to estimate food volume in an input image.
+Using a monocular depth prediction network to estimate the food volume in an input image.
 
 
 ## Method
 #### Depth Network Training
-A depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf). The sequences used for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes more than fifty hours of egocentric, food handling videos.
+A depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf). The sequences for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes more than fifty hours of egocentric, food handling videos. To improve predictions, the network is afterwards fine-tuned on a [food videos dataset](http://link-to-food-videos.com), captured by lab staff. 
 
 ![Depth Network Training](/assets/readme_assets/depth_train.png)
 
+### Segmentation Network Training
+A [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf) instance segmentation network is trained to predict the food object segmentation mask. Pre-trained weights on the [COCO](http://cocodataset.org/#home) dataset are fine-tuned using the [UNIMIB2016 Food Database](http://www.ivl.disco.unimib.it/activities/food-recognition/), with individual classes aggregated into a single food class to compensate for the limited number of images. The Mask RCNN implementation is taken from [matterport](https://github.com/matterport/Mask_RCNN).
+
 #### Volume Estimation
-The food input image is passed through the trained depth network and segmentation module to predict the
-depth map and food object mask. These outputs, along with the camera intrinsics, generate a point cloud on
-which the volume estimation is perfomed. When using images that depict a general kitchen scene, the food
-segmentation module may also include the plate in the segmentation mask. In such cases, the point cloud to
-volume algorithm can compensate the added error by using only an approximated filled portion of the whole
-plate, to avoid overestimating the food volume [plate_correction branch].
+The food input image is passed through the depth and segmentation networks to predict the depth map and food object mask respectively. These outputs, along with the camera intrinsics, generate a point cloud on which the volume estimation is perfomed.
 
 ![Volume Estimation](/assets/readme_assets/vol_est.png)
 
 
 ## Requirements
-
+(Have to review this section)
 The code is written and tested in ```python 3.6 ```. The required pip packages for running the volume estimation script are:
 ```
 numpy==1.16.3
@@ -33,10 +31,11 @@ keras==2.2.4
 h5py==2.9.0
 matplotlib==3.0.3
 ```
-To train the model you also need ```image-classifiers==0.2.1``` for importing the required Resnet18 model and weights.
+To train the depth estimation model you also need ```image-classifiers==0.2.1``` for importing the required Resnet18 model and weights.
 
 
 ## Training
+### Depth Estimation Network
 To train the depth estimation network use the ```monovideo.py``` script as:
 ```
 monovideo.py --train --train_dataframe dataFrame.csv --config config.json 
@@ -51,7 +50,7 @@ path_to_frame_t | path_to_frame_t-1 | path_to_frame_t+1
 path_to_frame_t+1 | path_to_frame_t | path_to_frame_t+2
 ... | ... | ... 
 
-and a JSON file (```config.json```) that describes various training parameters:
+and a JSON file (```config.json```) that describes the training parameters:
 ```
 {
   "name": "epic-kitchens",
@@ -60,7 +59,7 @@ and a JSON file (```config.json```) that describes various training parameters:
   "depth_range": [0.01, 10]
 }
 ```
-The model architecture is saved in ```name.json``` when the model is instantiated whereas the model weights are saved in ```name_weights_[epoch_e/final].h5``` every ```S``` epochs and when training is complete ([H5 format](https://www.h5py.org/)). All outputs are stored in the ```trained_models``` directory.
+The model architecture is saved in ```name.json``` when the model is instantiated whereas the model weights are saved in ```name_weights_[epoch_e/final].h5``` every ```S``` epochs and when training is complete. All outputs are stored in the ```trained_models``` directory.
 
 The triplet-defining dataFrame can be created using the ```data_utils.py``` script as:
 ```
@@ -80,7 +79,14 @@ To avoid redefining the data sources after creating and saving a training set of
 ```
 data_utils.py --create_dir_df --data_source img_dir --save_target df.csv --stride S
 ```
-The recommended stride value for the EPIC-Kitchens dataset is 10.
+The recommended stride value for the EPIC-Kitchens dataset is 10. The extracted frames per second, used for the food videos is 4.
+
+### Segmentation Network
+To train the segmentation network use the ```food_instance_segmentation.py``` script as:
+```
+food_instance_segmentation.py --dataset path_to_dataset --weights starting_weights --epochs e
+```
+The dataset path should lead to ```train``` and ```val``` directories, containing the training and validation images. By specifying the starting weights as ```coco``` the script automatically downloads the COCO pre-trained Mask RCNN weights.
 
 ## Testing
 The ```model_tests.py``` script offers testing of either all network outputs or the full-scale predicted depth:
@@ -99,11 +105,11 @@ Again, a Pandas dataFrame defining the frame triplets is required, since the all
 To estimate the food volume in an input image use the ```estimate_volume.py``` script as:
 ```
 estimate_volume.py --input_image img_path --depth_model_architecture model_name.json
-  --depth_model_weights model_name_weights.h5 --segmentation_model [GAP/GMAP/GMP]
+  --depth_model_weights model_name_weights.h5 --segmentation_weights segmentation_model_weights.h5
   --fov D --focal_length F --depth_rescaling R --min_depth min_d --max_depth max_d
-  [--plot_results]
+  --relaxation_param relax_param [--plot_results]
 ```
-The model architecture and weights are generated by the training script, as discussed above. If either the camera field of view (FoV) or focal length is given, the intrinsics matrix is generated during runtime. Otherwise, a default 60 degrees FoV is used to generate the matrix. The depth rescaling, min depth and max depth parameters are model-dependent and should not be changed unless the model has been retrained with the new values. 
+The model architecture and weights are generated by the training script, as discussed above. The camera field of view (FoV) or focal length must be given, to generate the intrinsics matrix during runtime. The depth rescaling, min depth, max depth and relaxation parameters are model-dependent and should not be changed unless the model has been retrained and tested with the new values. 
 
 If you wish to visualize the volume estimation pipeline, run the example notebook ```visualize_volume_estimation.ipynb```. Point cloud plots are dependent on the [PyntCloud library](https://github.com/daavoo/pyntcloud).
 
@@ -113,34 +119,20 @@ Download links for the pre-trained models:
 - Low-res model:
   - Architecture: https://drive.google.com/open?id=1IJ4k1TtFpConpkJVsGf37F-WWJ1rmP4Y
   - Weights: https://drive.google.com/open?id=1mFvc20GbzUGyo9xl401BNxGNSLiKEewr
+- Fine-tuned model:
+  - Architecture: n/a
+  - Weights: n/a
+- Segmentation model:
+  - Weights: n/a
 
+## Volume estimation examples:
 
-## Known Issues and Improvements
-A list of observed issues along with proposed improvements is given below:
-- The content of the training frames revolves around the general kitchen environment and not specifically
-food. Thus the granularity of the estimated depth on food surfaces is not as fine as the target objective
-requires, leading to rougher volume estimations. To solve this problem, the depth estimation network
-should be trained using videos focusing on food. However, food video datasets such as PFID have no
-camera motion (e.g., the food is placed on a rotating platter and the camera is stationary), which is
-critical to providing the network with a training signal.
-- The depth network generates depth values corresponding to the scene depth range of the training frames.
-In order to correctly estimate the depth of an input image, with a different depth range than the one
-seen during training, the network output must be rescaled. In this implementation, the rescaling is done
-manually by multiplying the output with an approximation of the input median depth. Adding scenes with
-various scene depth ranges to the training dataset, could help in achieving this generalization property.
-- The point cloud to volume algorithm finds a base plane on which the food is placed upon and calculates
-the volume contained between the plane and food surfaces. The fitted plane does not always match the
-actual plate, impairing the volume estimation. A potential improvement would be to fit pre-defined shapes
-on the generated point clou
-
-## Depth prediction examples:
-
-Example 1: | Example 2:
+Example 1 - Measurement 0.297L | Example 2 - Measurement 0.297L
 ------------ | -------------
-![Example 1](/assets/readme_assets/examples/close_example_1.png) | ![Example 2](/assets/readme_assets/examples/close_example_4.png)
+![Example 1](/assets/readme_assets/examples/example_steak_1.png) | ![Example 2](/assets/readme_assets/examples/example_steak_2.png)
 
-Example 3: | Example 4:
+Example 3 - Measurement 0.518L | Example 4 - Measurement 0.131L
 ------------ | -------------
-![Example 3](/assets/readme_assets/examples/medium_example_1.png) | ![Example 4](/assets/readme_assets/examples/far_example_1.png)
+![Example 3](/assets/readme_assets/examples/example_spaghetti_1.png) | ![Example 4](/assets/readme_assets/examples/example_cake_1.png)
 
 
