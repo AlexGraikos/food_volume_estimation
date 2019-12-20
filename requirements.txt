@@ -8,4 +8,6 @@ scikit-learn==0.21.1
 scikit-image==0.16.2
 image-classifiers==0.2.2
 matplotlib==3.0.3
+pyntcloud==0.1.2
+pythreejs==2.1.1
 IPython

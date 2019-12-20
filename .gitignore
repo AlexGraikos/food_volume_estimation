@@ -6,6 +6,9 @@ datasets/UNIMIB2016/*
 models/*
 assets/*
 .ipynb_checkpoints
+build/*
+dist/*
+*.egg-info
 
 # Filetypes to ignore
 *.pyc
