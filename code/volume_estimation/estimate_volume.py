@@ -10,9 +10,9 @@ from scipy.spatial.distance import pdist
 from scipy.stats import skew
 from keras.models import Model, model_from_json
 import keras.backend as K
-from food_segmentator import FoodSegmentator
-from custom_modules import *
-from project import *
+from food_segmentation.food_segmentator import FoodSegmentator
+from depth_estimation.custom_modules import *
+from depth_estimation.project import *
 from point_cloud_utils import *
 import matplotlib.pyplot as plt
 
