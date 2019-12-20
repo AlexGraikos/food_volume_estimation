@@ -60,11 +60,10 @@ class_id_map = {c: i+1 for i,c in enumerate(clusters)}
 
 
 # Mask RCNN Configuration
-ROOT_DIR = os.path.abspath('../')
-sys.path.append(ROOT_DIR)  # To find local version of the library
+ROOT_DIR = os.path.abspath('../../')
 from mrcnn.config import Config
 from mrcnn import model as modellib, utils
-COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, 'mask_rcnn_coco.h5')
+COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, '/models/mask_rcnn_coco.h5')
 DEFAULT_LOGS_DIR = 'logs/'
 
 
@@ -93,7 +92,7 @@ class FoodConfig(Config):
 
 
 class FoodDataset(utils.Dataset):
-    def load_food(self, dataset_dir, subset):
+    def load_food(self, dataset_dir, subset, annotations_file):
         """Load a subset of the UNIMIB2016 food dataset.
 
         Inputs:
@@ -105,7 +104,6 @@ class FoodDataset(utils.Dataset):
             self.add_class('UNIMIB2016-food', i+1, c)
         
         # Load annotations file
-        annotations_file = os.path.join(dataset_dir, 'annotations.json')
         with open(annotations_file, 'r') as json_file:
             annotations = json.load(json_file)
 
@@ -198,7 +196,7 @@ class FoodDataset(utils.Dataset):
             super(self.__class__, self).image_reference(image_id)
 
 
-def train(model, dataset_dir, epochs):
+def train(model, dataset_dir, annotations_file, epochs):
     from imgaug import augmenters as iaa
 
     """Train the mask rcnn model.
@@ -212,7 +210,7 @@ def train(model, dataset_dir, epochs):
     """
     # Training dataset
     dataset_train = FoodDataset()
-    dataset_train.load_food(dataset_dir, 'train')
+    dataset_train.load_food(dataset_dir, 'train', annotations_file)
     dataset_train.prepare()
     print('[*] Training dataset:')
     print(' ', 'Image Count: {}'.format(len(dataset_train.image_ids)))
@@ -221,7 +219,7 @@ def train(model, dataset_dir, epochs):
 
     #Validation dataset
     dataset_val = FoodDataset()
-    dataset_val.load_food(dataset_dir, 'val')
+    dataset_val.load_food(dataset_dir, 'val', annotations_file)
     dataset_val.prepare()
     print('[*] Validation dataset:')
     print(' ', 'Image Count: {}'.format(len(dataset_val.image_ids)))
@@ -276,7 +274,7 @@ def infer(model, image_paths):
                                     r['masks'], r['class_ids'],
                                     class_names, r['scores'])
 
-def eval_on_set(model, dataset_dir, subset, n_evals=3):
+def eval_on_set(model, dataset_dir, subset, annotations_file, n_evals=3):
     """Show evaluation examples of model on given subset of dataset.
 
     Inputs:
@@ -291,7 +289,7 @@ def eval_on_set(model, dataset_dir, subset, n_evals=3):
 
     # Evaluation set
     dataset = FoodDataset()
-    dataset.load_food(dataset_dir, subset)
+    dataset.load_food(dataset_dir, subset, annotations_file)
     dataset.prepare()
     print('[*] Evaluation dataset:')
     print(' ', 'Image Count: {}'.format(len(dataset.image_ids)))
@@ -334,6 +332,9 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', required=False,
                         metavar='/path/to/food/dataset/',
                         help='Directory of the food dataset.')
+    parser.add_argument('--annotations', required=False,
+                        metavar='/path/to/dataset/annotations.json',
+                        help='Dataset annotations file.')
     parser.add_argument('--weights', required=True,
                         metavar='/path/to/weights.h5',
                         help='Path to weights .h5 file or "coco".')
@@ -359,10 +360,14 @@ if __name__ == '__main__':
     # Validate arguments
     if args.command == 'train':
         assert args.dataset, 'Argument --dataset is required for training'
+        assert args.annotations, ('Argument --annotations is required for '
+                                  'training')
     elif args.command == 'infer':
         assert args.images, 'Provide --image to detect food in'
     elif args.command == 'eval':
         assert args.dataset, 'Argument --dataset is required for evaluating'
+        assert args.annotations, ('Argument --annotations is required for '
+                                  'evaluating')
 
     print('[*] Weights:', '"' + args.weights + '".')
     if args.command == 'infer':
@@ -419,11 +424,11 @@ if __name__ == '__main__':
 
     # Train, infer or evaluate
     if args.command == 'train':
-        train(model, args.dataset, args.epochs)
+        train(model, args.dataset, args.annotations, args.epochs)
     elif args.command == 'infer':
         infer(model, args.images)
     elif args.command == 'eval':
-        eval_on_set(model, args.dataset, 'val', args.n_evals)
+        eval_on_set(model, args.dataset, 'val', args.annotations, args.n_evals)
     else:
         print('[!] "{}" is not recognized. '
               'Use "train", "infer" or "eval".'.format(args.command))

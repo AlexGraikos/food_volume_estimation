@@ -1,6 +1,4 @@
 import sys
-sys.path.append('depth_estimation/')
-sys.path.append('segmentation/food/')
 import argparse
 import numpy as np
 import pandas as pd
@@ -13,7 +11,7 @@ import keras.backend as K
 from food_segmentation.food_segmentator import FoodSegmentator
 from depth_estimation.custom_modules import *
 from depth_estimation.project import *
-from point_cloud_utils import *
+from volume_estimation.point_cloud_utils import *
 import matplotlib.pyplot as plt
 
 # TODO: - Decide on the plane estimation. Options are:

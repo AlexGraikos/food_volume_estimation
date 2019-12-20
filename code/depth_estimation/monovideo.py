@@ -7,8 +7,8 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import LearningRateScheduler, LambdaCallback
 import keras.preprocessing.image as pre
-from custom_modules import *
-from networks import NetworkBuilder
+from depth_estimation.custom_modules import *
+from depth_estimation.networks import NetworkBuilder
 
 
 class MonovideoModel:

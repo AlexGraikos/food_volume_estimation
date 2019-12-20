@@ -1,9 +1,5 @@
 import sys
 import os
-
-# Setup Mask-RCNN library
-MASK_RCNN_DIR = os.path.abspath('../')
-sys.path.append(MASK_RCNN_DIR)  # To find Mask RCNN library
 from mrcnn.config import Config
 from mrcnn import model as modellib, utils
 

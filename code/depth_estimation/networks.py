@@ -3,9 +3,10 @@ import tensorflow as tf
 from keras.models import Model
 from keras.layers import Conv2D, UpSampling2D, GlobalAveragePooling2D, \
     LeakyReLU, Dense, Flatten, Input, Concatenate, Lambda, BatchNormalization
-from classification_models.resnet import ResNet18
-from custom_modules import *
+from classification_models.keras import Classifiers
+from depth_estimation.custom_modules import *
 
+ResNet18, _ = Classifiers.get('resnet18')
 
 class NetworkBuilder:
     def __init__(self, img_shape, intrinsics_matrix=None,

@@ -5,8 +5,8 @@ import json
 from keras.models import Model, model_from_json
 import keras.preprocessing.image as pre
 import matplotlib.pyplot as plt
-from networks import NetworkBuilder
-from custom_modules import *
+from depth_estimation.networks import NetworkBuilder
+from depth_estimation.custom_modules import *
 
 
 class ModelTests:

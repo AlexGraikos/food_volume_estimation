@@ -3,12 +3,6 @@ import sys
 import argparse
 import json
 import numpy as np
-
-# Root directory of the project
-ROOT_DIR = os.path.abspath('../')
-
-# Import Mask RCNN
-sys.path.append(ROOT_DIR)  # To find local version of the library
 from mrcnn.config import Config
 from mrcnn import model as modellib, utils
 from mrcnn import visualize
@@ -28,6 +22,9 @@ if __name__ == '__main__':
     parser.add_argument('--subset', required=True,
                         metavar='<subset_dir>',
                         help='Subset directory, "train" or "val".')
+    parser.add_argument('--annotations', required=True,
+                        metavar='/path/to/dataset/annotations.json',
+                        help='Dataset annotations file.')
     parser.add_argument('--n_reps', required=False, type=int,
                         metavar='<number of evaluations>',
                         default=3,
@@ -39,7 +36,7 @@ if __name__ == '__main__':
            'Subset must be either "train" or "val".')
     config = FoodConfig()
     dataset = FoodDataset()
-    dataset.load_food(args.dataset, args.subset)
+    dataset.load_food(args.dataset, args.subset, args.annotations)
     dataset.prepare()
     
     # Show general dataset information 
@@ -49,8 +46,7 @@ if __name__ == '__main__':
         print('{:3}. {:50}'.format(i, info['name']))
 
     # Load annotations
-    annotations_file = os.path.join(args.dataset, 'annotations.json')
-    with open(annotations_file, 'r') as json_file:
+    with open(args.annotations, 'r') as json_file:
         annotations = json.load(json_file)
 
     # Count number of instances per original and clustered label
