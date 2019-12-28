@@ -155,7 +155,7 @@ class VolumeEstimator():
         img_batch = np.reshape(img, (1,) + img.shape)
         inverse_depth = self.depth_model.predict(img_batch)[0][0,:,:,0] 
         disparity_map = (self.min_disp + (self.max_disp - self.min_disp) 
-                           * inverse_depth)
+                         * inverse_depth)
         predicted_median_depth = np.median(1 / disparity_map)
         depth = ((self.gt_depth_scale / predicted_median_depth) 
                  * (1 / disparity_map))
@@ -187,61 +187,27 @@ class VolumeEstimator():
                 object_depth, (object_depth.shape[0] * object_depth.shape[1]))
                 > 0)
             object_points = point_cloud_flat[object_mask, :]
-            non_object_points = point_cloud_flat[np.logical_not(object_mask), :]
+            non_object_points = point_cloud_flat[
+                np.logical_not(object_mask), :]
 
-            # Estimate plate plane parameters
-            plane_params = plane_estimation(object_points)
             # Filter outlier points
             object_points_filtered, sor_mask = sor_filter(
                 object_points, 2, 0.7)
-            # Transform object to match z-axis with plate normal
+            # Estimate base plane parameters
+            plane_params = pca_plane_estimation(object_points_filtered)
+            # Transform object to match z-axis with plane normal
             translation, rotation_matrix = align_plane_with_axis(
                 plane_params, np.array([0, 0, 1]))
             object_points_transformed = np.dot(
                 object_points_filtered + translation, rotation_matrix.T)
 
-            # Zero mean the transformed points and separate those 
-            # over and under surface 
-            object_points_transformed[:,2] -= np.mean(
-                object_points_transformed[:,2])
-            over_surface_points = (
-                object_points_transformed[object_points_transformed[:,2] > 0])
-            under_surface_points = (
-                object_points_transformed[object_points_transformed[:,2] < 0])
-
-            # Compute skewness of the each set's distances distribution 
-            # as a measure of connectivity 
-            # [more connected -> smaller distances -> higher skewness]
-            over_surface_dist = pdist(over_surface_points, 'euclidean')
-            over_surface_skew = skew(over_surface_dist)
-            under_surface_dist = pdist(under_surface_points, 'euclidean')
-            under_surface_skew = skew(under_surface_dist)
-
-            # Use skewness measure to determine if the food surface is 
-            # concave or convex and adjust to plate surface accordingly
-            if over_surface_skew > under_surface_skew:
-                print('[*] Concave food surface')
-                # Place plate surface underneath the food object
-                distance_hist, bins = np.histogram(
-                    object_points_transformed[:,2], bins=15)
-                distance_density = distance_hist / np.sum(distance_hist)
-                cum_density = np.cumsum(distance_density)
-                z_adj_indx = next(x for x, val in enumerate(cum_density) 
-                                  if val > self.relax_param)
-                z_adj = (bins[z_adj_indx] + bins[z_adj_indx+1]) / 2
-                object_points_transformed[:,2] += np.abs(z_adj)
-            else:
-                print('[*] Convex food surface')
-                # Place plate surface above the food object
-                distance_hist, bins = np.histogram(
-                    object_points_transformed[:,2], bins=15)
-                distance_density = distance_hist / np.sum(distance_hist)
-                cum_density = np.cumsum(distance_density)
-                z_adj_indx = next(x for x, val in enumerate(cum_density) 
-                                  if val > (1 - self.relax_param))
-                z_adj = (bins[z_adj_indx] + bins[z_adj_indx+1]) / 2
-                object_points_transformed[:,2] -= np.abs(z_adj)
-                
+            # Adjust object on base plane
+            height_sorted_indices = np.argsort(object_points_transformed[:,2])
+            adjustment_index = height_sorted_indices[
+                int(object_points_transformed.shape[0] * self.relax_param)]
+            object_points_transformed[:,2] += np.abs(
+                object_points_transformed[adjustment_index, 2])
+             
             if plot_results:
                 # Create object points from estimated plane
                 plane_z = np.apply_along_axis(
@@ -282,7 +248,7 @@ class VolumeEstimator():
                 plane_points_transformed_df = pd.DataFrame(
                     plane_points_transformed, columns=['x','y','z'])
 
-                # Estimate volume for points above the plate
+                # Estimate volume for points above the plane
                 volume_points = object_points_transformed[
                     object_points_transformed[:,2] > 0]
                 estimated_volume, simplices = pc_to_volume(volume_points)
@@ -300,7 +266,7 @@ class VolumeEstimator():
                      plane_points_df, object_points_transformed_df,
                      plane_points_transformed_df, simplices))
             else:
-                # Estimate volume for points above the plate
+                # Estimate volume for points above the plane
                 volume_points = object_points_transformed[
                     object_points_transformed[:,2] > 0]
                 estimated_volume, _ = pc_to_volume(volume_points)
