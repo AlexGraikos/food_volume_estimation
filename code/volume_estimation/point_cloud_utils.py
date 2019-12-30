@@ -11,7 +11,7 @@ def linear_plane_estimation(points):
     least squares.
 
     Inputs:
-        points: Input points [n,x,y,z].
+        points: Input points Mx3.
     Outputs:
         params: Plane parameters (w0,w1,w2,w3).
     """
@@ -30,8 +30,12 @@ def pca_plane_estimation(points):
     Returns:
         params: Plane parameters (w0,w1,w2,w3).
     """
+    # Fit a linear model to determine the plane normal orientation
+    linear_params = linear_plane_estimation(points)
+    linear_model_normal = np.array(linear_params[1:])
+
     # Zero mean the points and compute the covariance
-    # matrix Eigenvalues/Eigenvectors
+    # matrix eigenvalues/eigenvectors
     point_mean = np.mean(points, axis=0)
     zero_mean_points = points - point_mean
     cov_matrix = np.cov(zero_mean_points.T)
@@ -40,20 +44,14 @@ def pca_plane_estimation(points):
     sort_indices = np.argsort(eigenvalues)[::-1]
     eigenvalues = eigenvalues[sort_indices]
     eigenvectors = eigenvectors[:, sort_indices]
-    
-    # Fit a linear model to determine the plane normal orientation
-    model = linear_model.LinearRegression()
-    model.fit(points[:,:2], points[:,2:])
-    linear_params = (model.intercept_.tolist() 
-                     + model.coef_[0].tolist() + [-1])
-    linear_model_normal = np.array(linear_params[1:])
 
     # Use the least important component's eigenvector as plane normal
     normal = eigenvectors[:,2]
     # Align the PCA plane normal with the linear model plane normal
-    if np.dot(normal, linear_model_normal):
+    if np.dot(normal, linear_model_normal) < 0:
         normal = normal * (-1)
     params = [-np.dot(normal, point_mean), normal[0], normal[1], normal[2]]
+
     return params
 
 def align_plane_with_axis(plane_params, axis):
@@ -146,22 +144,26 @@ def pc_to_volume(points, alpha=0.01):
     alpha_simplices_array = np.array(list(alpha_simplices))
     return total_volume, alpha_simplices_array
 
-def pretty_plotting(imgs, tiling, titles):
+def pretty_plotting(imgs, tiling, titles, suptitle=None):
     """Plot images in a pretty grid.
 
     Inputs:
         imgs: List of images to plot.
         tiling: Subplot tiling tuple (rows,cols).
         titles: List of subplot titles.
+        suptitle: Suptitle above all plots.
     """
     n_plots = len(imgs)
     rows = str(tiling[0])
     cols = str(tiling[1])
-    plt.figure()
+    fig = plt.figure()
     for r in range(tiling[0] * tiling[1]):
         plt.subplot(rows + cols + str(r + 1))
         plt.title(titles[r])
         plt.imshow(imgs[r])
         if ('Depth' in titles[r]) or ('depth' in titles[r]):
             plt.colorbar()
+
+    if suptitle is not None:
+        fig.suptitle(suptitle)
 

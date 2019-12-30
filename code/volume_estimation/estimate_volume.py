@@ -258,7 +258,9 @@ class VolumeEstimator():
                 pretty_plotting([img, depth, object_img, object_depth], 
                                 (2,2),
                                 ['Input Image', 'Depth', 'Object Mask',
-                                 'Object Depth'])
+                                 'Object Depth'],
+                                'Estimated Volume: {:.3f} L'.format(
+                                estimated_volume * 1000.0))
                 plt.show()
 
                 estimated_volumes.append(
