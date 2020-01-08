@@ -14,14 +14,6 @@ from depth_estimation.project import *
 from volume_estimation.point_cloud_utils import *
 import matplotlib.pyplot as plt
 
-# TODO: - Decide on the plane estimation. Options are:
-#         a) Use linear regression on food points and then adjust. This is
-#            similar to finding the convex hull.
-#         b) Find a way to use ransac to estimate a plate plane and calculate
-#            volume according to that. Using non-object points has issues.
-#       - Add tensorboard logging to depth estimation model training.
-#       - Clean up a bit more.
-
 
 class VolumeEstimator():
     """Volume estimator object."""

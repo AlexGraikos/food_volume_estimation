@@ -56,7 +56,7 @@ def pca_plane_estimation(points):
 
 def align_plane_with_axis(plane_params, axis):
     """Compute the translation vector and rotation matrix to align 
-    given plane with axis.
+    plane normal with axis.
     
     Inputs:
         plane_params: Plane parameters (w0,w1,w2,w3).
@@ -84,7 +84,7 @@ def sor_filter(points, z_max=1, inlier_ratio=0.5):
     """Statistical outlier filtering of point cloud data.
 
     Inputs:
-        points: Input points [n,x,y,z].
+        points: Input points Mx3.
         z_max: Maximum z-score for inliers.
         inlier_ratio: Assumption of min inliers to outliers ratio.
     Returns:
@@ -104,7 +104,8 @@ def sor_filter(points, z_max=1, inlier_ratio=0.5):
 
 def pc_to_volume(points, alpha=0.01):
     """Compute the volume of a point cloud using the alpha shape.
-    Modified from http://blog.thehumangeo.com/2014/05/12/drawing-boundaries-in-python/
+    Alpha shape computation modified from
+    http://blog.thehumangeo.com/2014/05/12/drawing-boundaries-in-python/
 
     Inputs:
         points: Mx3 array of points.
@@ -137,8 +138,9 @@ def pc_to_volume(points, alpha=0.01):
 
         if circum_r < alpha:
             # Add volume defined by this triangle to the total volume
-            total_volume += area * ((points[simplex[0], 2] + points[simplex[1], 2]
-                               + points[simplex[2], 2]) / 3)
+            total_volume += area * ((points[simplex[0], 2]
+                                     + points[simplex[1], 2]
+                                     + points[simplex[2], 2]) / 3)
             alpha_simplices.add((simplex[0], simplex[1], simplex[2]))
 
     alpha_simplices_array = np.array(list(alpha_simplices))
