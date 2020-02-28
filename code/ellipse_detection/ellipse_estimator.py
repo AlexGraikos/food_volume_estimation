@@ -108,7 +108,7 @@ class EllipseEstimator(object):
             a = ax / math.cos(rho)
             try:
                 a_acc[int(a)] += 1
-            except IndexError as error:
+            except (IndexError, OverflowError) as error:
                 # Major semi-axis found is out of accumulator range
                 continue
 
