@@ -12,6 +12,7 @@ from food_segmentation.food_segmentator import FoodSegmentator
 from depth_estimation.custom_modules import *
 from depth_estimation.project import *
 from volume_estimation.point_cloud_utils import *
+from ellipse_detection.ellipse_detector import EllipseDetector
 import matplotlib.pyplot as plt
 
 
@@ -43,16 +44,17 @@ class VolumeEstimator():
                                                  custom_objects=objs)
             self.__set_weights_trainable(self.monovideo, False)
             self.monovideo.load_weights(self.args.depth_model_weights)
-            self.model_input_shape = self.monovideo.inputs[0].shape[1:]
+            self.model_input_shape = (
+                self.monovideo.inputs[0].shape.as_list()[1:])
             depth_net = self.monovideo.get_layer('depth_net')
             self.depth_model = Model(inputs=depth_net.inputs,
                                      outputs=depth_net.outputs,
                                      name='depth_model')
             print('[*] Loaded depth estimation model.')
             # Depth model configuration
-            self.gt_depth_scale = self.args.gt_depth_scale
             self.min_disp = 1 / self.args.max_depth
             self.max_disp = 1 / self.args.min_depth
+            self.gt_depth_scale = self.args.gt_depth_scale
 
             # Create segmentator object
             self.segmentator = FoodSegmentator(self.args.segmentation_weights)
@@ -69,9 +71,9 @@ class VolumeEstimator():
         # Parse command line arguments
         parser = argparse.ArgumentParser(
             description='Estimate food volume in input image.')
-        parser.add_argument('--input_image', type=str,
-                            help='Input image path.',
-                            metavar='/path/to/image',
+        parser.add_argument('--input_images', type=str, nargs='+',
+                            help='Paths to input images.',
+                            metavar='/path/to/image1 /path/to/image2 ...',
                             required=True)
         parser.add_argument('--depth_model_architecture', type=str,
                             help=('Depth estimation model '
@@ -94,10 +96,15 @@ class VolumeEstimator():
                             help='Camera focal length (in px).',
                             metavar='<focal_length>',
                             default=None)
+        parser.add_argument('--plate_diameter_prior', type=float,
+                            help=('Expected plate diameter (in m) .'
+                                  + ' or 0 to ignore plate scaling'),
+                            metavar='<plate_diameter_prior>',
+                            default=0.3)
         parser.add_argument('--gt_depth_scale', type=float,
                             help='Ground truth depth rescaling factor.',
                             metavar='<gt_depth_scale>',
-                            default=1)
+                            default=0.35)
         parser.add_argument('--min_depth', type=float,
                             help='Minimum depth value.',
                             metavar='<min_depth>',
@@ -113,6 +120,10 @@ class VolumeEstimator():
         parser.add_argument('--plot_results', action='store_true',
                             help='Plot volume estimation results.',
                             default=False)
+        parser.add_argument('--results_file', type=str,
+                            help='File to save results at (.csv).',
+                            metavar='/path/to/results.csv',
+                            default=None)
         args = parser.parse_args()
         
         assert (args.fov is not None) or (args.focal_length is not None), (
@@ -120,13 +131,15 @@ class VolumeEstimator():
 
         return args
 
-    def estimate_volume(self, input_image, fov, focal_length, plot_results):
+    def estimate_volume(self, input_image, fov, focal_length, 
+            plate_diameter_prior, plot_results):
         """Volume estimation procedure.
 
         Inputs:
             input_image: Path to input image.
             fov: Camera Field of View.
             focal_length: Camera Focal length.
+            plate_diameter_prior: Expected plate diameter.
             plot_results: Result plotting flag.
         Returns:
             estimated_volume: Estimated volume.
@@ -148,15 +161,58 @@ class VolumeEstimator():
         inverse_depth = self.depth_model.predict(img_batch)[0][0,:,:,0] 
         disparity_map = (self.min_disp + (self.max_disp - self.min_disp) 
                          * inverse_depth)
-        predicted_median_depth = np.median(1 / disparity_map)
-        depth = ((self.gt_depth_scale / predicted_median_depth) 
-                 * (1 / disparity_map))
+        depth = 1 / disparity_map
         # Convert depth map to point cloud
         depth_tensor = K.variable(np.expand_dims(depth, 0))
         intrinsics_inv_tensor = K.variable(np.expand_dims(intrinsics_inv, 0))
         point_cloud = K.eval(get_cloud(depth_tensor, intrinsics_inv_tensor))
         point_cloud_flat = np.reshape(
             point_cloud, (point_cloud.shape[1] * point_cloud.shape[2], 3))
+
+        # Find the ellipse parameterss (cx, cy, a, b, theta) that 
+        # describe the plate contour
+        ellipse_scale = 2.5
+        ellipse_detector = EllipseDetector(
+            (ellipse_scale * self.model_input_shape[0],
+             ellipse_scale * self.model_input_shape[1]))
+        ellipse_params = ellipse_detector.detect(input_image)
+        ellipse_params_scaled = tuple(
+            [x / ellipse_scale for x in ellipse_params[:-1]]
+            + [ellipse_params[-1]])
+
+        # Scale depth map
+        if (any(x != 0 for x in ellipse_params_scaled) and
+                plate_diameter_prior != 0):
+            print('[*] Ellipse parameters:', ellipse_params_scaled)
+            # Find the scaling factor to match prior 
+            # and measured plate diameters
+            plate_point_1 = [int(ellipse_params_scaled[2] 
+                             * np.sin(ellipse_params_scaled[4]) 
+                             + ellipse_params_scaled[1]), 
+                             int(ellipse_params_scaled[2] 
+                             * np.cos(ellipse_params_scaled[4]) 
+                             + ellipse_params_scaled[0])]
+            plate_point_2 = [int(-ellipse_params_scaled[2] 
+                             * np.sin(ellipse_params_scaled[4]) 
+                             + ellipse_params_scaled[1]),
+                             int(-ellipse_params_scaled[2] 
+                             * np.cos(ellipse_params_scaled[4]) 
+                             + ellipse_params_scaled[0])]
+            plate_point_1_3d = point_cloud[0, plate_point_1[0], 
+                                           plate_point_1[1], :]
+            plate_point_2_3d = point_cloud[0, plate_point_2[0], 
+                                           plate_point_2[1], :]
+            plate_diameter = np.linalg.norm(plate_point_1_3d 
+                                            - plate_point_2_3d)
+            scaling = plate_diameter_prior / plate_diameter
+        else:
+            # Use the median ground truth depth scaling
+            print('[*] No ellipse found. Scaling with expected median depth.')
+            predicted_median_depth = np.median(1 / disparity_map)
+            scaling = self.gt_depth_scale / predicted_median_depth
+        depth = scaling * depth
+        point_cloud = scaling * point_cloud
+        point_cloud_flat = scaling * point_cloud_flat
 
         # Predict segmentation masks
         masks_array = self.segmentator.infer_masks(input_image)
@@ -240,6 +296,26 @@ class VolumeEstimator():
                 plane_points_transformed_df = pd.DataFrame(
                     plane_points_transformed, columns=['x','y','z'])
 
+                # Outline the detected plate contour and major axis vertices 
+                plate_contour = np.copy(img)
+                if (any(x != 0 for x in ellipse_params_scaled) and
+                        plate_diameter_prior != 0):
+                    ellipse_color = (68 / 255, 1 / 255, 84 / 255)
+                    vertex_color = (253 / 255, 231 / 255, 37 / 255)
+                    cv2.ellipse(plate_contour,
+                                (int(ellipse_params_scaled[0]),
+                                 int(ellipse_params_scaled[1])), 
+                                (int(ellipse_params_scaled[2]),
+                                 int(ellipse_params_scaled[3])),
+                                ellipse_params_scaled[4] * 180 / np.pi, 
+                                0, 360, ellipse_color, 2)
+                    cv2.circle(plate_contour,
+                               (int(plate_point_1[1]), int(plate_point_1[0])),
+                               2, vertex_color, -1)
+                    cv2.circle(plate_contour,
+                               (int(plate_point_2[1]), int(plate_point_2[0])),
+                               2, vertex_color, -1)
+
                 # Estimate volume for points above the plane
                 volume_points = object_points_transformed[
                     object_points_transformed[:,2] > 0]
@@ -247,10 +323,10 @@ class VolumeEstimator():
                 print('[*] Estimated volume:', estimated_volume * 1000, 'L')
 
                 # Plot input image and predicted segmentation mask/depth
-                pretty_plotting([img, depth, object_img, object_depth], 
+                pretty_plotting([img, plate_contour, depth, object_img], 
                                 (2,2),
-                                ['Input Image', 'Depth', 'Object Mask',
-                                 'Object Depth'],
+                                ['Input Image', 'Plate Contour', 'Depth', 
+                                 'Object Mask'],
                                 'Estimated Volume: {:.3f} L'.format(
                                 estimated_volume * 1000.0))
                 plt.show()
@@ -311,7 +387,24 @@ class VolumeEstimator():
 
 if __name__ == '__main__':
     estimator = VolumeEstimator()
-    estimator.estimate_volume(estimator.args.input_image, estimator.args.fov,
-                              estimator.args.focal_length,
-                              estimator.args.plot_results)
+
+    # Iterate over input images, estimate volumes and store results
+    results = {'image_path': [], 'volumes': []}
+    for input_image in estimator.args.input_images:
+        print('[*] Input:', input_image)
+
+        volumes = estimator.estimate_volume(
+            input_image, estimator.args.fov, estimator.args.focal_length,
+            estimator.args.plate_diameter_prior, estimator.args.plot_results)
+
+        results['image_path'].append(input_image)
+        if estimator.args.plot_results:
+            results['volumes'].append([x[0] for x in volumes])
+        else:
+            results['volumes'].append(volumes)
+
+    if estimator.args.results_file is not None:
+        # Save results in CSV format
+        volumes_df = pd.DataFrame(data=results)
+        volumes_df.to_csv(estimator.args.results_file, index=False)
 

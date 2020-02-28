@@ -163,8 +163,6 @@ def pretty_plotting(imgs, tiling, titles, suptitle=None):
         plt.subplot(rows + cols + str(r + 1))
         plt.title(titles[r])
         plt.imshow(imgs[r])
-        if ('Depth' in titles[r]) or ('depth' in titles[r]):
-            plt.colorbar()
 
     if suptitle is not None:
         fig.suptitle(suptitle)
