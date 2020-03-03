@@ -146,10 +146,10 @@ class SegmentDetector(object):
         # TODO: You should implement Canny edge detection for boost speed.
 
         # Detect edge by Canny edge detector
-        image_edge = cv2.Canny(image=image, threshold1=100, threshold2=200)
+        image_gauss = cv2.GaussianBlur(src=image, ksize=(7, 7), sigmaX=2)
+        image_edge = cv2.Canny(image=image_gauss, threshold1=10, threshold2=120)
 
         # Compute pixel gradient direction by Sovel filter
-        image_gauss = cv2.GaussianBlur(src=image, ksize=(5, 5), sigmaX=3)
         image_dx = cv2.Sobel(src=image_gauss, ddepth=cv2.CV_32FC1, dx=1, dy=0)
         image_dy = cv2.Sobel(src=image_gauss, ddepth=cv2.CV_32FC1, dx=0, dy=1)
 

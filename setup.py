@@ -10,7 +10,7 @@ except Exception:
 
 setup(
     name='food-volume-estimation',
-    version='0.2',
+    version='0.3',
     description='Estimate food volume from input image.',
     url='https://github.com/AlexGraikos/food_volume_estimation',
     author='Graikos Alexandros',

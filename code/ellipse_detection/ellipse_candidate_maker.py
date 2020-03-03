@@ -6,7 +6,7 @@ from ellipse_detection.ellipse_candidate import EllipseCandidate
 
 
 class EllipseCandidateMaker(object):
-    ELLIPSE_CENTER_REJECT_DISTANCE = 10
+    ELLIPSE_CENTER_REJECT_DISTANCE = 25
 
     def __init__(self):
         pass

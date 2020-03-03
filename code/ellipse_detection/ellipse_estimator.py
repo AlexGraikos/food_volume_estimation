@@ -91,7 +91,11 @@ class EllipseEstimator(object):
                         rho_bin = int((rho + math.pi / 2) / math.pi * (cls.NUM_BIN_RHO_ACCUMULATOR - 1))
                     except ValueError:
                         continue
-                    n_bin = int(n * (cls.NUM_BIN_N_ACCUMULATOR - 1))
+
+                    try:
+                        n_bin = int(n * (cls.NUM_BIN_N_ACCUMULATOR - 1))
+                    except ValueError:
+                        continue
 
                     n_acc[n_bin] += 1
                     rho_acc[rho_bin] += 1
