@@ -1,24 +1,23 @@
 # Food volume estimation
-Using a monocular depth prediction network to estimate the food volume in an input image.
+Utilizing deep learning to estimate the food volume in an input image.
 
 
 ## Method
 #### Depth Network Training
-A depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf). The sequences for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes more than fifty hours of egocentric, food handling videos. To improve predictions, the network is afterwards fine-tuned on a [food videos dataset](http://link-to-food-videos.com), captured by lab staff. 
+A depth estimation network is trained using monocular video sequences, as suggested by [Godard et al.](https://arxiv.org/pdf/1806.01260.pdf). The sequences for this purpose are obtained from the [EPIC-Kitchens](http://epic-kitchens.github.io/) dataset, which includes more than fifty hours of egocentric, food handling videos. To improve predictions, the network is afterwards fine-tuned on a [food videos dataset](https://drive.google.com/open?id=1IE1s7aWVpynwrdJFeYlJxb3n80VKqxxL), captured by smartphone cameras. 
 
 ![Depth Network Training](/assets/readme_assets/depth_train.png)
 
 ### Segmentation Network Training
-A [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf) instance segmentation network is trained to predict the food object segmentation mask. Pre-trained weights on the [COCO](http://cocodataset.org/#home) dataset are fine-tuned using the [UNIMIB2016 Food Database](http://www.ivl.disco.unimib.it/activities/food-recognition/), with individual classes aggregated into a single food class to compensate for the limited number of images. The Mask RCNN implementation is taken from [matterport](https://github.com/matterport/Mask_RCNN).
+A [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf) instance segmentation network is trained to predict the various food object segmentation masks. Pre-trained weights on the [COCO](http://cocodataset.org/#home) dataset are fine-tuned using the [UNIMIB2016 Food Database](http://www.ivl.disco.unimib.it/activities/food-recognition/), with individual classes aggregated into a single food class to compensate for the limited number of images. The Mask RCNN implementation is taken from [matterport](https://github.com/matterport/Mask_RCNN).
 
 #### Volume Estimation
-The food input image is passed through the depth and segmentation networks to predict the depth map and food object mask respectively. These outputs, along with the camera intrinsics, generate a point cloud on which the volume estimation is perfomed.
+The food input image is passed through the depth and segmentation networks to predict the depth map and food object masks respectively. These outputs, along with the camera intrinsics, generate a point cloud on which the volume estimation is perfomed. Experimentally, there is also an option to scale the predicted depth map with a prior plate diameter. The plate detection used for this purpose is based on [this implementation](https://github.com/horiken4/ellipse-detection) of the "Very Fast Ellipse Detection for Embedded Vision Applications" algorithm.
 
 ![Volume Estimation](/assets/readme_assets/vol_est.png)
 
 
 ## Requirements
-(Have to review this section)
 The code is written and tested in ```python 3.6 ```. The required pip packages for running the volume estimation script are:
 ```
 numpy==1.16.3
@@ -31,7 +30,15 @@ keras==2.2.4
 h5py==2.9.0
 matplotlib==3.0.3
 ```
-To train the depth estimation model you also need ```image-classifiers==0.2.1``` for importing the required Resnet18 model and weights.
+To install this project, first make sure you have all the required packages
+```
+pip install -r requirements.txt
+```
+and then install using the ```setup.py``` script
+```
+python setup.py install
+```
+Training the depth estimation model also requires ```image-classifiers==0.2.1``` to import the Resnet18 model and weights.
 
 
 ## Training
@@ -88,6 +95,7 @@ food_instance_segmentation.py --dataset path_to_dataset --weights starting_weigh
 ```
 The dataset path should lead to ```train``` and ```val``` directories, containing the training and validation images. By specifying the starting weights as ```coco``` the script automatically downloads the COCO pre-trained Mask RCNN weights.
 
+
 ## Testing
 The ```model_tests.py``` script offers testing of either all network outputs or the full-scale predicted depth:
 ```
@@ -104,35 +112,32 @@ Again, a Pandas dataFrame defining the frame triplets is required, since the all
 ## Volume Estimation
 To estimate the food volume in an input image use the ```estimate_volume.py``` script as:
 ```
-estimate_volume.py --input_image img_path --depth_model_architecture model_name.json
+estimate_volume.py --input_images [img_path_1 img_path_2] --depth_model_architecture model_name.json
   --depth_model_weights model_name_weights.h5 --segmentation_weights segmentation_model_weights.h5
-  --fov D --focal_length F --depth_rescaling R --min_depth min_d --max_depth max_d
-  --relaxation_param relax_param [--plot_results]
+  --fov D --gt_depth_scale S --plate_diameter_prior D --min_depth min_d --max_depth max_d
+  --relaxation_param relax_param --plot_results --results_file results.csv --plots_directory plots/
 ```
-The model architecture and weights are generated by the training script, as discussed above. The camera field of view (FoV) or focal length must be given, to generate the intrinsics matrix during runtime. The depth rescaling, min depth, max depth and relaxation parameters are model-dependent and should not be changed unless the model has been retrained and tested with the new values. 
+The model architecture and weights are generated by the training script, as discussed above. The camera field of view (FoV) is used to generate the intrinsics matrix during runtime. The gt_depth_scale is the expected distance between the camera and food object and is used in scaling the depth map. The min depth, max depth and relaxation parameters are model-dependent and should not be changed unless the model has been retrained and tested with these new values. If a plate diameter prior is given, then the rescaling is performed by matching the detected plate diameter with the given value. 
 
 If you wish to visualize the volume estimation pipeline, run the example notebook ```visualize_volume_estimation.ipynb```. Point cloud plots are dependent on the [PyntCloud library](https://github.com/daavoo/pyntcloud).
 
 
 ## Models
 Download links for the pre-trained models:
-- Low-res model:
-  - Architecture: https://drive.google.com/open?id=1IJ4k1TtFpConpkJVsGf37F-WWJ1rmP4Y
-  - Weights: https://drive.google.com/open?id=1mFvc20GbzUGyo9xl401BNxGNSLiKEewr
-- Fine-tuned model:
-  - Architecture: n/a
-  - Weights: n/a
+- Depth prediction model:
+  - Architecture: https://drive.google.com/open?id=1t-nlUvbtD6ungcj0I_BweubRnbUogjVG
+  - Weights: https://drive.google.com/open?id=1fbzlVq3KaqVBtsLNBEsEMQLnr-hc8GkB
 - Segmentation model:
-  - Weights: n/a
+  - Weights: https://drive.google.com/open?id=1Y-TEatoy16QwHyRQvWBkvd0ZHd4E0Lgd
+
 
 ## Volume estimation examples:
-
-Example 1 - Measurement 0.297L | Example 2 - Measurement 0.297L
+Example 1 | Example 2 
 ------------ | -------------
-![Example 1](/assets/readme_assets/examples/example_steak_1.png) | ![Example 2](/assets/readme_assets/examples/example_steak_2.png)
+![Example 1](/assets/readme_assets/examples/example_rice.png) | ![Example 2](/assets/readme_assets/examples/example_spaghetti.png)
 
-Example 3 - Measurement 0.518L | Example 4 - Measurement 0.131L
+Example 3 | Example 4
 ------------ | -------------
-![Example 3](/assets/readme_assets/examples/example_spaghetti_1.png) | ![Example 4](/assets/readme_assets/examples/example_cake_1.png)
+![Example 3](/assets/readme_assets/examples/example_combined_chicken.png) | ![Example 4](/assets/readme_assets/examples/example_combined_potatoes.png)
 
 
