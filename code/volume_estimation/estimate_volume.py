@@ -97,7 +97,7 @@ class VolumeEstimator():
                             help=('Expected plate diameter (in m) .'
                                   + ' or 0 to ignore plate scaling'),
                             metavar='<plate_diameter_prior>',
-                            default=0.3)
+                            default=0.0)
         parser.add_argument('--gt_depth_scale', type=float,
                             help='Ground truth depth rescaling factor.',
                             metavar='<gt_depth_scale>',
