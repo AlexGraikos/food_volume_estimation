@@ -132,12 +132,16 @@ Download links for the pre-trained models:
 
 
 ## Volume estimation examples:
-Example 1 | Example 2 
+Example 1 - No plate scaling | Example 2 - No plate scaling 
 ------------ | -------------
-![Example 1](/assets/readme_assets/examples/example_rice.png) | ![Example 2](/assets/readme_assets/examples/example_spaghetti.png)
+![Example 1](/assets/readme_assets/examples/example_pastitsio.png) | ![Example 2](/assets/readme_assets/examples/example_bread.png)
 
-Example 3 | Example 4
+Example 3 - Plate scaling | Example 4 - Plate scaling 
 ------------ | -------------
-![Example 3](/assets/readme_assets/examples/example_combined_chicken.png) | ![Example 4](/assets/readme_assets/examples/example_combined_potatoes.png)
+![Example 3](/assets/readme_assets/examples/example_rice.png) | ![Example 4](/assets/readme_assets/examples/example_spaghetti.png)
+
+Example 5 - Plate scaling and multiple foods  | Example 6 - Plate scaling and multiple foods
+------------ | -------------
+![Example 5](/assets/readme_assets/examples/example_combined_chicken.png) | ![Example 6](/assets/readme_assets/examples/example_combined_potatoes.png)
 
 
