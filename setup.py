@@ -8,6 +8,8 @@ try:
 except Exception:
     logging.warning('[!] Failed at loading requirements file.')
 
+print(find_packages())
+
 setup(
     name='food-volume-estimation',
     version='0.3',
@@ -15,8 +17,6 @@ setup(
     url='https://github.com/AlexGraikos/food_volume_estimation',
     author='Graikos Alexandros',
     author_email='graikosal@gmail.com',
-    package_dir={'': 'code'},
-    packages=find_packages(where='code'),
     install_requires=install_reqs,
     python_requires='>=3.6',
     classifiers=[
@@ -30,5 +30,6 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     keywords='food volume estimation tensorflow keras',
+    packages=find_packages()
 )
 

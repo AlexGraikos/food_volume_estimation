@@ -110,9 +110,9 @@ Again, a Pandas dataFrame defining the frame triplets is required, since the all
 
 
 ## Volume Estimation
-To estimate the food volume in an input image use the ```estimate_volume.py``` script as:
+To estimate the food volume in an input image use the ```volume_estimator.py``` script as:
 ```
-estimate_volume.py --input_images [img_path_1 img_path_2] --depth_model_architecture model_name.json
+volume_estimator.py --input_images [img_path_1 img_path_2] --depth_model_architecture model_name.json
   --depth_model_weights model_name_weights.h5 --segmentation_weights segmentation_model_weights.h5
   --fov D --gt_depth_scale S --plate_diameter_prior D --min_depth min_d --max_depth max_d
   --relaxation_param relax_param --plot_results --results_file results.csv --plots_directory plots/

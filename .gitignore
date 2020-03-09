@@ -5,6 +5,7 @@ datasets/food_videos_dataset/*
 datasets/UNIMIB2016/*
 models/*
 assets/*
+results/*
 .ipynb_checkpoints
 build/*
 dist/*
