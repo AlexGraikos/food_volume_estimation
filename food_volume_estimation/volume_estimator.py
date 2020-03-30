@@ -8,12 +8,46 @@ from scipy.spatial.distance import pdist
 from scipy.stats import skew
 from keras.models import Model, model_from_json
 import keras.backend as K
+from fuzzywuzzy import fuzz, process 
 import matplotlib.pyplot as plt
 from food_volume_estimation.depth_estimation.custom_modules import *
 from food_volume_estimation.depth_estimation.project import *
 from food_volume_estimation.food_segmentation.food_segmentator import FoodSegmentator
 from food_volume_estimation.ellipse_detection.ellipse_detector import EllipseDetector
 from food_volume_estimation.point_cloud_utils import *
+
+
+class FAO_INFOODS_Database():
+    """FAO/INFOODS Density Database searcher object."""
+    def __init__(self, db_path):
+        """Load database from file.
+
+        Inputs:
+            db_path: Path to database excel file (.xlsx).
+        """
+        # Read density database from excel file
+        self.density_database = pd.read_excel(
+            db_path, sheet_name='Density DB', usecols=[0, 1])
+        # Remove rows with NaN values
+        self.density_database.dropna(inplace=True)
+
+    def query(self, food):
+        """Search for food density in database.
+
+        Inputs:
+            food: Food type to search for.
+
+        Returns:
+            db_entry_vals: Array containing the matched food type
+            and its density.
+        """
+        # Search for matching food in database
+        match = process.extractOne(food, self.density_database.values[:,0],
+                                   scorer=fuzz.partial_ratio)
+        db_entry = (self.density_database.loc[
+            self.density_database[self.density_database.columns[0]] == match[0]])
+        db_entry_vals = db_entry.values
+        return db_entry_vals[0]
 
 
 class VolumeEstimator():
@@ -61,6 +95,12 @@ class VolumeEstimator():
 
             # Plate adjustment relaxation parameter
             self.relax_param = self.args.relaxation_param
+
+            # If given initialize food density database 
+            if self.args.density_db is not None:
+                self.fao_infoods_db = FAO_INFOODS_Database(
+                    self.args.density_db)
+
 
     def __parse_args(self):
         """Parse command-line input arguments.
@@ -123,6 +163,14 @@ class VolumeEstimator():
         parser.add_argument('--plots_directory', type=str,
                             help='Directory to save plots at (.png).',
                             metavar='/path/to/plot/directory/',
+                            default=None)
+        parser.add_argument('--density_db', type=str,
+                            help='Path to food density database (.xlsx).',
+                            metavar='/path/to/plot/database.xlsx',
+                            default=None)
+        parser.add_argument('--food_type', type=str,
+                            help='Food type to calculate weight for.',
+                            metavar='<food_type>',
                             default=None)
         args = parser.parse_args()
         
@@ -410,8 +458,20 @@ if __name__ == '__main__':
         else:
             results['volumes'].append(volumes * 1000)
 
+        # Print weight if density database is given
+        if estimator.args.density_db is not None:
+            db_entry = estimator.fao_infoods_db.query(
+                estimator.args.food_type)
+            density = db_entry[1]
+            print('[*] Density database match:', db_entry)
+            # All foods found in the input image are considered to be
+            # of the same type
+            for v in results['volumes'][-1]:
+                print('[*] Food weight:', 1000 * v * density, 'g')
+
     if estimator.args.results_file is not None:
         # Save results in CSV format
         volumes_df = pd.DataFrame(data=results)
         volumes_df.to_csv(estimator.args.results_file, index=False)
+
 
