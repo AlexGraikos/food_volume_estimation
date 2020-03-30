@@ -130,6 +130,9 @@ Download links for the pre-trained models:
 - Segmentation model:
   - Weights: https://drive.google.com/open?id=1Y-TEatoy16QwHyRQvWBkvd0ZHd4E0Lgd
 
+## Todo
+- From an input image and the corresponding single food type, determine the depicted food weight.
+- Docker integration.
 
 ## Volume estimation examples:
 Example 1 - No plate scaling | Example 2 - No plate scaling 
