@@ -256,12 +256,13 @@ def train(model, dataset_dir, annotations_file, epochs):
                 epochs=epochs[1],
                 layers='all')
 
-def infer(model, image_paths):
+def infer(model, image_paths, save_dir=None):
     """Infer the model output on a single image.
 
     Inputs:
         model: Model to use for inference.
         image_paths: List of paths to images to detect food in.
+        save_dir: Directory to save results at.
     """
     from food_volume_estimation.food_segmentation.mrcnn import visualize
     from food_volume_estimation.food_segmentation.mrcnn.visualize import display_images
@@ -275,6 +276,26 @@ def infer(model, image_paths):
         visualize.display_instances(image, r['rois'],
                                     r['masks'], r['class_ids'],
                                     class_names, r['scores'])
+
+        if save_dir is not None:
+            import os
+            import cv2
+
+            # Create save directory if it does not exist
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+
+            for i in range(r['masks'].shape[-1]):
+                # Save food object mask in file
+                mask = r['masks'][:,:,i]
+                masked_img = mask[:,:, np.newaxis] * image
+                masked_img = cv2.cvtColor(masked_img, cv2.COLOR_RGB2BGR)
+
+                (img_name, ext) = os.path.splitext(os.path.basename(path))
+                filename = '{}_mask_{}{}'.format(img_name, i+1, ext)
+                save_path = os.path.join(save_dir, filename)
+                cv2.imwrite(save_path, masked_img)
+
 
 def eval_on_set(model, dataset_dir, subset, annotations_file, n_evals=3):
     """Show evaluation examples of model on given subset of dataset.
@@ -357,6 +378,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_evals', required=False, type=int,
                         metavar='<number of evaluations>',
                         help='Number of images to evaluate results on.')
+    parser.add_argument('--save_dir', required=False,
+                        metavar='/path/to/results/dir/', default=None,
+                        help='Directory to save results at.')
     args = parser.parse_args()
 
     # Validate arguments
@@ -365,7 +389,7 @@ if __name__ == '__main__':
         assert args.annotations, ('Argument --annotations is required for '
                                   'training')
     elif args.command == 'infer':
-        assert args.images, 'Provide --image to detect food in'
+        assert args.images, 'Provide --images to detect food in'
     elif args.command == 'eval':
         assert args.dataset, 'Argument --dataset is required for evaluating'
         assert args.annotations, ('Argument --annotations is required for '
@@ -428,7 +452,7 @@ if __name__ == '__main__':
     if args.command == 'train':
         train(model, args.dataset, args.annotations, args.epochs)
     elif args.command == 'infer':
-        infer(model, args.images)
+        infer(model, args.images, args.save_dir)
     elif args.command == 'eval':
         eval_on_set(model, args.dataset, 'val', args.annotations, args.n_evals)
     else:
