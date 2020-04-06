@@ -1,0 +1,11 @@
+assets/*
+datasets/*
+models/*
+build/*
+dist/*
+results/*
+
+# Include model files
+!models/fine_tune_food_videos/monovideo_fine_tune_food_videos.json
+!models/fine_tune_food_videos/monovideo_fine_tune_food_videos.h5
+!models/segmentation/mask_rcnn_food_segmentation.h5

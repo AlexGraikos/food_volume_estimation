@@ -8,8 +8,6 @@ try:
 except Exception:
     logging.warning('[!] Failed at loading requirements file.')
 
-print(find_packages())
-
 setup(
     name='food-volume-estimation',
     version='0.3',

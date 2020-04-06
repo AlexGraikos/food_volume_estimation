@@ -11,18 +11,21 @@ class EllipseDetector(object):
     def __init__(self, input_shape):
         self.input_shape = input_shape
 
-    def detect(self, image_path):
+    def detect(self, input_image):
         """Detect ellipse from image.
 
         Args:
-            image_path: Input image path
+            input_image: Input image path or image array.
 
         Returns:
             Array of Ellipse instance that was detected from image.
         """
 
         # Load and convert image to grayscale
-        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        if isinstance(input_image, str):
+            image = cv2.imread(input_image, cv2.IMREAD_COLOR)
+        else:
+            image = input_image
         image = cv2.resize(image, (int(self.input_shape[1]),
                                    int(self.input_shape[0])))
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY) # Author's mistake??

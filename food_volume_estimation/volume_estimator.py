@@ -41,13 +41,16 @@ class FAO_INFOODS_Database():
             db_entry_vals: Array containing the matched food type
             and its density.
         """
-        # Search for matching food in database
-        match = process.extractOne(food, self.density_database.values[:,0],
-                                   scorer=fuzz.partial_ratio)
-        db_entry = (self.density_database.loc[
-            self.density_database[self.density_database.columns[0]] == match[0]])
-        db_entry_vals = db_entry.values
-        return db_entry_vals[0]
+        try:
+            # Search for matching food in database
+            match = process.extractOne(food, self.density_database.values[:,0],
+                                       scorer=fuzz.partial_ratio)
+            db_entry = (self.density_database.loc[
+                self.density_database[self.density_database.columns[0]] == match[0]])
+            db_entry_vals = db_entry.values
+            return db_entry_vals[0]
+        except:
+            return ['Not Found', 0]
 
 
 class VolumeEstimator():
@@ -182,7 +185,7 @@ class VolumeEstimator():
         """Volume estimation procedure.
 
         Inputs:
-            input_image: Path to input image.
+            input_image: Path to input image or image array.
             fov: Camera Field of View.
             plate_diameter_prior: Expected plate diameter.
             plot_results: Result plotting flag.
@@ -191,7 +194,10 @@ class VolumeEstimator():
             estimated_volume: Estimated volume.
         """
         # Load input image and resize to model input size
-        img = cv2.imread(input_image, cv2.IMREAD_COLOR)
+        if isinstance(input_image, str):
+            img = cv2.imread(input_image, cv2.IMREAD_COLOR)
+        else:
+            img = input_image
         input_image_shape = img.shape
         img = cv2.resize(img, (self.model_input_shape[1],
                                self.model_input_shape[0]))

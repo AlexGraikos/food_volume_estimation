@@ -37,18 +37,22 @@ class FoodSegmentator():
         print('[*] Loading segmentation model weights', weights_path)
         self.model.load_weights(weights_path, by_name=True)
 
-    def infer_masks(self, image_path):
+    def infer_masks(self, input_image):
         """Infer the segmentation masks in the input image.
 
         Inputs:
-            image_path: Path to image to detect food in.
+            input_image: Path to image or image array to detect food in.
         Returns:
             masks: [m,n,k] array containing each of the K masks detected.
         """
-        import skimage.draw
+        import cv2
 
         # Load image and infer masks
-        image = skimage.io.imread(image_path)
+        if isinstance(input_image, str):
+            image = cv2.imread(input_image, cv2.IMREAD_COLOR)
+        else:
+            image = input_image
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.model.detect([image], verbose=0)
         r = results[0]
         masks = r['masks'].astype('float32') # openCV can't resize int images
@@ -61,13 +65,14 @@ class FoodSegmentator():
         Inputs:
             image_paths: List of paths to images to detect food in.
         """
-        import skimage.draw
+        import cv2
         from food_volume_estimation.food_segmentation.mrcnn import visualize
         from food_volume_estimation.food_segmentation.mrcnn.visualize import display_images
 
         for path in image_paths:
             class_names = ['bg'] + clusters
-            image = skimage.io.imread(path)
+            image = cv2.imread(path, cv2.IMREAD_COLOR)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             results = self.model.detect([image], verbose=0)
             r = results[0]
             visualize.display_instances(image, r['rois'],
