@@ -17,17 +17,26 @@ from food_volume_estimation.ellipse_detection.ellipse_detector import EllipseDet
 from food_volume_estimation.point_cloud_utils import *
 
 
-class FAO_INFOODS_Database():
-    """FAO/INFOODS Density Database searcher object."""
+class DensityDatabase():
+    """Density Database searcher object. Food types are expected to be
+    in column 1, food densities in column 2."""
     def __init__(self, db_path):
-        """Load database from file.
+        """Load food density database from file or Google Sheets ID.
 
         Inputs:
-            db_path: Path to database excel file (.xlsx).
+            db_path: Path to database excel file (.xlsx) or Google Sheets ID.
         """
-        # Read density database from excel file
-        self.density_database = pd.read_excel(
-            db_path, sheet_name='Density DB', usecols=[0, 1])
+        if os.path.exists(db_path):
+            # Read density database from excel file
+            self.density_database = pd.read_excel(
+                db_path, sheet_name=0, usecols=[0, 1])
+        else:
+            # Read density database from Google Sheets URL
+            sheet = 'Sheet1'
+            url = 'https://docs.google.com/spreadsheets/d/{0}/gviz/tq?tqx=out:csv&sheet={1}'.format(
+                db_path, sheet)
+            self.density_database = pd.read_csv(url, usecols=[0, 1],
+                                                header=None)
         # Remove rows with NaN values
         self.density_database.dropna(inplace=True)
 
@@ -44,13 +53,16 @@ class FAO_INFOODS_Database():
         try:
             # Search for matching food in database
             match = process.extractOne(food, self.density_database.values[:,0],
-                                       scorer=fuzz.partial_ratio)
-            db_entry = (self.density_database.loc[
-                self.density_database[self.density_database.columns[0]] == match[0]])
+                                       scorer=fuzz.partial_ratio,
+                                       score_cutoff=80)
+            db_entry = (
+                self.density_database.loc[
+                self.density_database[
+                self.density_database.columns[0]] == match[0]])
             db_entry_vals = db_entry.values
             return db_entry_vals[0]
         except:
-            return ['Not Found', 0]
+            return ['None', 1]
 
 
 class VolumeEstimator():
@@ -101,8 +113,7 @@ class VolumeEstimator():
 
             # If given initialize food density database 
             if self.args.density_db is not None:
-                self.fao_infoods_db = FAO_INFOODS_Database(
-                    self.args.density_db)
+                self.density_db = DensityDatabase(self.args.density_db)
 
 
     def __parse_args(self):
@@ -136,8 +147,8 @@ class VolumeEstimator():
                             metavar='<fov>',
                             default=70)
         parser.add_argument('--plate_diameter_prior', type=float,
-                            help=('Expected plate diameter (in m) .'
-                                  + ' or 0 to ignore plate scaling'),
+                            help=('Expected plate diameter (in m) '
+                                  + 'or 0 to ignore plate scaling'),
                             metavar='<plate_diameter_prior>',
                             default=0.0)
         parser.add_argument('--gt_depth_scale', type=float,
@@ -168,8 +179,9 @@ class VolumeEstimator():
                             metavar='/path/to/plot/directory/',
                             default=None)
         parser.add_argument('--density_db', type=str,
-                            help='Path to food density database (.xlsx).',
-                            metavar='/path/to/plot/database.xlsx',
+                            help=('Path to food density database (.xlsx) ' +
+                                  'or Google Sheets ID.'),
+                            metavar='/path/to/plot/database.xlsx or <ID>',
                             default=None)
         parser.add_argument('--food_type', type=str,
                             help='Food type to calculate weight for.',
@@ -466,7 +478,7 @@ if __name__ == '__main__':
 
         # Print weight if density database is given
         if estimator.args.density_db is not None:
-            db_entry = estimator.fao_infoods_db.query(
+            db_entry = estimator.density_db.query(
                 estimator.args.food_type)
             density = db_entry[1]
             print('[*] Density database match:', db_entry)

@@ -19,5 +19,6 @@ COPY food_volume_estimation_app.py .
 ENTRYPOINT ["python", "food_volume_estimation_app.py", \
             "--depth_model_architecture", "models/depth_architecture.json", \
             "--depth_model_weights", "models/depth_weights.h5", \
-            "--segmentation_model_weights", "models/segmentation_weights.h5"]
+            "--segmentation_model_weights", "models/segmentation_weights.h5", \
+            "--density_db_source"]
 
