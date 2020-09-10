@@ -7,6 +7,7 @@ from food_volume_estimation.volume_estimator import VolumeEstimator, DensityData
 from food_volume_estimation.depth_estimation.custom_modules import *
 from food_volume_estimation.food_segmentation.food_segmentator import FoodSegmentator
 from flask import Flask, request, jsonify, make_response, abort
+import base64
 
 
 app = Flask(__name__)
@@ -75,21 +76,23 @@ def volume_estimation():
     """
     # Decode incoming byte stream to get an image
     try:
-        img_bytes = request.files['img'].read()
-        np_img = np.fromstring(img_bytes, np.uint8)
+        content = request.get_json()
+        img_encoded = content['img']
+        img_byte_string = base64.b64decode(img_encoded) # Decode if in base64
+        np_img = np.fromstring(img_byte_string, np.uint8)
         img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
     except Exception as e:
         abort(406)
 
     # Get food type
     try:
-        food_type = request.form['food_type']
+        food_type = content['food_type']
     except Exception as e:
         abort(406)
 
     # Get expected plate diameter from form data or set to 0 and ignore
     try:
-        plate_diameter = float(request.form['plate_diameter'])
+        plate_diameter = float(content['plate_diameter'])
     except Exception as e:
         plate_diameter = 0
 
