@@ -32,15 +32,30 @@ class ModelTests:
             self.monovideo = nets_builder.create_monovideo()
             self.__set_weights_trainable(self.monovideo, False)
         else:
+            # Updated model loading to fix issue with lambda layers
+            with open(self.args.model_architecture, 'r') as read_file:
+                custom_losses = Losses()
+                objs = {'ProjectionLayer': ProjectionLayer,
+                        'ReflectionPadding2D': ReflectionPadding2D,
+                        'InverseDepthNormalization': InverseDepthNormalization,
+                        'AugmentationLayer': AugmentationLayer,
+                        'compute_source_loss': custom_losses.compute_source_loss}
+                model_architecture_json = json.load(read_file)
+                self.monovideo = model_from_json(model_architecture_json, custom_objects=objs)
+        self.monovideo.load_weights(self.args.model_weights)
+        print('[*] Loaded depth estimation model.')
+
+        '''
+        Does not work - lambda layers crash the loading
             objs = {'ProjectionLayer': ProjectionLayer, 
                     'ReflectionPadding2D': ReflectionPadding2D,
                     'InverseDepthNormalization': InverseDepthNormalization,
                     'AugmentationLayer': AugmentationLayer}
-            with open(self.args.model_architecture, 'r') as read_file:
                 model_architecture_json = json.load(read_file)
                 self.monovideo = model_from_json(
                     model_architecture_json, custom_objects=objs)
         self.monovideo.load_weights(self.args.model_weights)
+        '''
 
     def parse_args(self):
         """Parses command-line input arguments.
