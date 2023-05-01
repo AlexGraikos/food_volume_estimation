@@ -10,5 +10,5 @@ matplotlib==3.0.3
 pyntcloud==0.1.2
 pythreejs==2.1.1
 IPython
-Flask==1.1.1
+Flask==2.3.2
 fuzzywuzzy==0.18.0
