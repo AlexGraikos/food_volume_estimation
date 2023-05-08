@@ -196,7 +196,7 @@ def _egomotion_vec2mat(vec, batch_size):
     ry = tf.slice(vec, [0, 4], [-1, 1])
     rz = tf.slice(vec, [0, 5], [-1, 1])
     rot_mat = _euler2mat(rz, ry, rx)
-    rot_mat = tf.squeeze(rot_mat, squeeze_dims=[1])
+    rot_mat = tf.squeeze(rot_mat, axis=[1])
     filler = tf.constant([0.0, 0.0, 0.0, 1.0], shape=[1, 1, 4])
     filler = tf.tile(filler, [batch_size, 1, 1])
     transform_mat = tf.concat([rot_mat, translation], axis=2)
@@ -225,7 +225,7 @@ def _bilinear_sampler(im, x, y, name='blinear_sampler'):
             in the mask indicates that the corresponding coordinate in the sampled
             image is valid.
     """
-    with tf.variable_scope(name):
+    with tf.compat.v1.variable_scope(name):
         x = tf.reshape(x, [-1])
         y = tf.reshape(y, [-1])
 
@@ -233,8 +233,8 @@ def _bilinear_sampler(im, x, y, name='blinear_sampler'):
         batch_size = tf.shape(im)[0]
         _, height, width, channels = im.get_shape().as_list()
 
-        x = tf.to_float(x)
-        y = tf.to_float(y)
+        x = tf.cast(x, dtype=tf.float32)
+        y = tf.cast(y, dtype=tf.float32)
         height_f = tf.cast(height, 'float32')
         width_f = tf.cast(width, 'float32')
         zero = tf.constant(0, dtype=tf.int32)
@@ -254,7 +254,7 @@ def _bilinear_sampler(im, x, y, name='blinear_sampler'):
         mask = tf.logical_and(
                 tf.logical_and(x0 >= zero, x1 <= max_x),
                 tf.logical_and(y0 >= zero, y1 <= max_y))
-        mask = tf.to_float(mask)
+        mask = tf.cast(mask, dtype=tf.float32)
 
         x0 = tf.clip_by_value(x0, zero, max_x)
         x1 = tf.clip_by_value(x1, zero, max_x)
@@ -278,14 +278,14 @@ def _bilinear_sampler(im, x, y, name='blinear_sampler'):
 
         # Use indices to lookup pixels in the flat image and restore channels dim.
         im_flat = tf.reshape(im, tf.stack([-1, channels]))
-        im_flat = tf.to_float(im_flat)
+        im_flat = tf.cast(im_flat, dtype=tf.float32)
         pixel_a = tf.gather(im_flat, idx_a)
         pixel_b = tf.gather(im_flat, idx_b)
         pixel_c = tf.gather(im_flat, idx_c)
         pixel_d = tf.gather(im_flat, idx_d)
 
-        x1_f = tf.to_float(x1)
-        y1_f = tf.to_float(y1)
+        x1_f = tf.cast(x1, dtype=tf.float32)
+        y1_f = tf.cast(y1, dtype=tf.float32)
 
         # And finally calculate interpolated values.
         wa = tf.expand_dims(((x1_f - x) * (y1_f - y)), 1)
@@ -312,7 +312,7 @@ def _spatial_transformer(img, coords):
 
 def get_cloud(depth, intrinsics_inv, name=None):
     """Convert depth map to 3D point cloud."""
-    with tf.name_scope(name):
+    with tf.compat.v1.name_scope(name):
         dims = depth.shape.as_list()
         batch_size, img_height, img_width = dims[0], dims[1], dims[2]
         depth = tf.reshape(depth, [batch_size, 1, img_height * img_width])

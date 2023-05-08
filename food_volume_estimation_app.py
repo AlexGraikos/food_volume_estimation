@@ -55,7 +55,7 @@ def load_volume_estimator(depth_model_architecture, depth_model_weights,
 
     # Need to define default graph due to Flask multiprocessing
     global graph
-    graph = tf.get_default_graph()
+    graph = tf.compat.v1.get_default_graph()
 
     # Load food density database
     global density_db
