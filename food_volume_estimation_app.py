@@ -78,11 +78,12 @@ def volume_estimation():
     try:
         content = request.get_json()
         img_encoded = content['img']
-        img_byte_string = ' '.join([str(x) for x in img_encoded]) # If in byteArray
-        #img_byte_string = base64.b64decode(img_encoded) # Decode if in base64
+        # img_byte_string = ' '.join([str(x) for x in img_encoded]) # If in byteArray
+        img_byte_string = base64.b64decode(img_encoded) # Decode if in base64
         np_img = np.fromstring(img_byte_string, np.int8, sep=' ')
         img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
     except Exception as e:
+        print(e.stacktrace, flush=True)
         abort(406)
 
     # Get food type

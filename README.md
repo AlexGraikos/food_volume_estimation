@@ -149,3 +149,11 @@ Example 5 - Plate scaling and multiple foods  | Example 6 - Plate scaling and mu
 ![Example 5](/assets/readme_assets/examples/example_combined_chicken.png) | ![Example 6](/assets/readme_assets/examples/example_combined_potatoes.png)
 
 
+## Running
+```
+python .\food_volume_estimation\volume_estimator.py --input_images pie1.png --depth_model_architecture .\models\monovideo_fine_tune_food_videos.json --depth_model_weights .\models\monovideo_fine_tune_food_videos.h5 --segmentation_weights .\models\mask_rcnn_food_segmentation.h5 --density_db .\models\food_density_db.xlsx
+```
+
+```
+python .\food_volume_estimation_app.py --depth_model_architecture .\models\monovideo_fine_tune_food_videos.json --depth_model_weights .\models\monovideo_fine_tune_food_videos.h5 --segmentation_model_weights .\models\mask_rcnn_food_segmentation.h5 --density_db .\models\food_density_db.xlsx
+```
