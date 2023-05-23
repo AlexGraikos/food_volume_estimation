@@ -69,25 +69,52 @@ class CocoWrapper:
                 return coco_categories[i]['name']
         return None
 
-    def generate_masks(self, training_images):
-        imgs = []
-        if training_images:
-            imgs = self.train_imgs
+    def generate_mask(self, img, catIds, training, categories):
+        # imgs = []
+        # if training:
+        #     imgs = self.train_imgs
+        #     catIds = self.coco_obj_train.getCatIds(catNms=categories)
+        # else:
+        #     imgs = self.validation_imgs
+        #     catIds = self.coco_obj_validation.getCatIds(catNms=categories)
+        # masks = []
+        # for i in range(len(imgs))[:1]:
+        #     img = imgs[i]
+        #     mask = np.zeros((img['height'],img['width']))
+        #     anns = self.coco_obj.loadAnns(self.coco_obj.getAnnIds(imgIds=img["id"], catIds=catIds))
+        #     for ann in anns:
+        #         className = self.getClassName(ann['category_id'], categories)
+        #         pixel_value = self.categorie_names.index(className)+1
+        #         mask = np.maximum(self.coco_obj.annToMask(ann)*pixel_value, mask).astype(np.uint8)
+        #     mask.reshape((img['height'],img['width'], 1))
+        #     masks.append(mask)
+        #     if i % 100 == 0:
+        #         print(f"Annotations of Image: {i+1}/{len(imgs)}")
+        # return masks
+        if training:
+            coco = self.coco_obj_train
         else:
-            imgs = self.validation_imgs
-        masks = []
-        for i in range(len(imgs))[:1]:
-            img = imgs[i]
-            mask = np.zeros((img['height'],img['width']))
-            anns = self.coco_obj.loadAnns(self.coco_obj.getAnnIds(imgIds=img["id"]))
-            for ann in anns:
-                className = self.getClassName(ann['category_id'], self.categories)
-                pixel_value = self.categorie_names.index(className)+1
-                mask = np.maximum(self.coco_obj.annToMask(ann)*pixel_value, mask).astype(np.uint8)
-            masks.append(mask)
-            if i % 100 == 0:
-                print(f"Annotations of Image: {i+1}/{len(imgs)}")
-        return masks
+            coco = self.coco_obj_validation
+
+        annIds = coco.getAnnIds(img['id'], catIds=catIds, iscrowd=None)
+        anns = coco.loadAnns(annIds)
+        cats = coco.loadCats(catIds)
+        train_mask = np.zeros((img['height'],img['width']))
+        for a in range(len(anns)):
+            className = self.getClassName(anns[a]['category_id'], cats)
+            pixel_value = categories.index(className)+1
+            train_mask = np.maximum(coco.annToMask(anns[a])*pixel_value, train_mask)
+
+        return train_mask.reshape(img['height'],img['width'], 1)
+
+    def create_data_generator(self, batch_size, train=True, classes=[]):
+        cnt = 0
+        while True:
+            for i in range(batch_size):
+                img = 
+
+            cnt += batch_size
+
 
 def load_food_recognition_22_dataset(train_annotations_path: str, train_img_dir: str, val_annotations_path: str, val_img_dir: str):
     assert train_annotations_path is not None and os.path.isfile(train_annotations_path), f"Provided path is not valid!"
