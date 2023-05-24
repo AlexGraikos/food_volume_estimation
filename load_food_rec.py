@@ -1,13 +1,9 @@
-from collections import OrderedDict
 from pycocotools.coco import COCO
-import json
 import os
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import plotly.graph_objects as go
-import tqdm
 import cv2
 import random
 # from keras.preprocessing.image import ImageDataGenerator
@@ -15,39 +11,6 @@ import random
 # heavily based on the tutorial from Viraf Patrawala (March, 2020)
 # https://github.com/virafpatrawala/COCO-Semantic-Segmentation/blob/master/COCOdataset_SemanticSegmentation_Demo.ipynb
 
-
-TRAIN_ANNOTATIONS_PATH = "/home/jannes/Documents/MasterDelft/Q4/DeepLearning/datasets/food_rec/raw_data/public_training_set_release_2.0/annotations.json"
-TRAIN_IMAGE_DIRECTORY = "/home/jannes/Documents/MasterDelft/Q4/DeepLearning/datasets/food_rec/raw_data/public_training_set_release_2.0/images/"
-
-VAL_ANNOTATIONS_PATH = "/home/jannes/Documents/MasterDelft/Q4/DeepLearning/datasets/food_rec/raw_data/public_validation_set_2.0/annotations.json"
-VAL_IMAGE_DIRECTORY = "/home/jannes/Documents/MasterDelft/Q4/DeepLearning/datasets/food_rec/raw_data/public_validation_set_2.0/images/"
-
-
-def fix_uneven_data(input_annotation_file, out_annotation_file: str, image_dir: str):
-    assert os.path.isdir(image_dir), f"Fix annotations: Provided path for images is invalid!"
-    assert os.path.isfile(input_annotation_file) is not None, f"Fix annotations: Given input filepath is invalid!"
-    coco_obj = COCO(input_annotation_file)
-    annotations = coco_obj.loadAnns(coco_obj.getAnnIds())
-
-    for n, i in enumerate(tqdm((annotations['images']))):
-        img = cv2.imread(image_dir+i["file_name"])
-        if img.shape[0] != i['height']:
-            annotations['images'][n]['height'] = img.shape[0]
-        if img.shape[1] != i['width']:
-            annotations['images'][n]['width'] = img.shape[1]
-    with open(out_annotation_file, 'w') as f:
-        json.dump(annotations, f)
-
-def visualize_datasplit(img_per_cat):
-    fig = go.Figure([go.Bar(x=list(img_per_cat.keys()), y=list(img_per_cat.values()))])
-    fig.update_layout(
-        title="No of Image per class", )
-    fig.show()
-    fig = go.Figure(data=[go.Pie(labels=list(img_per_cat.keys()), values=list(img_per_cat.values()),
-                                 hole=.3, textposition='inside', )], )
-    fig.update_layout(
-        title="No of Image per class ( In pie )", )
-    fig.show()
 
 class CocoDatasetGenerator:
 
