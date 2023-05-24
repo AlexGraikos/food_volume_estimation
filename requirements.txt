@@ -15,3 +15,4 @@ Flask==1.1.1
 fuzzywuzzy==0.18.0
 xlrd==1.1.0
 pyparsing==2.4.7
+pycocotools==2.0.6
