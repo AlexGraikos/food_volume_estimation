@@ -3,16 +3,14 @@ from pycocotools.coco import COCO
 import json
 import os
 import numpy as np
-import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import plotly.graph_objects as go
-import plotly.express as px
 import tqdm
 import cv2
 import random
-from tensorflow.keras import ImageDataGenerator
+# from keras.preprocessing.image import ImageDataGenerator
 
 # heavily based on the tutorial from Viraf Patrawala (March, 2020)
 # https://github.com/virafpatrawala/COCO-Semantic-Segmentation/blob/master/COCOdataset_SemanticSegmentation_Demo.ipynb
@@ -40,31 +38,52 @@ def fix_uneven_data(input_annotation_file, out_annotation_file: str, image_dir: 
     with open(out_annotation_file, 'w') as f:
         json.dump(annotations, f)
 
+def visualize_datasplit(img_per_cat):
+    fig = go.Figure([go.Bar(x=list(img_per_cat.keys()), y=list(img_per_cat.values()))])
+    fig.update_layout(
+        title="No of Image per class", )
+    fig.show()
+    fig = go.Figure(data=[go.Pie(labels=list(img_per_cat.keys()), values=list(img_per_cat.values()),
+                                 hole=.3, textposition='inside', )], )
+    fig.update_layout(
+        title="No of Image per class ( In pie )", )
+    fig.show()
 
 class CocoDatasetGenerator:
 
-    def __init__(self, annotations_path: str, img_dir: str, filter_categories=None) -> None:
-        assert os.path.isfile(self.annotations_path), f"Provided path for train annotations is invalid!"
+    def __init__(self, annotations_path: str, img_dir: str, filter_categories=None, data_size=(455,455)) -> None:
+        """ Initialize CocoDatasetGenerator
+
+        Args:
+            annotations_path (str): Absolute path to the coco annotations file
+            img_dir (str): Absolute path to the corresponding image directory
+            filter_categories (list, optional): List of category names to use. Uses all if None. Defaults to None.
+            data_size (tuple, optional): The size of the generator output images and masks. Defaults to (455,455).
+        """
+        assert os.path.isfile(annotations_path), f"Provided path for train annotations is invalid!"
         self.annotations_path = annotations_path
         self.img_dir = img_dir
+        self.data_size = data_size
         
         self.coco_obj = COCO(self.annotations_path)
 
-        if filter_categories is not None:
+        if filter_categories is None:
             self.imgs = self.coco_obj.loadImgs(self.coco_obj.getImgIds())
             self.annotations = self.coco_obj.loadAnns(self.coco_obj.getAnnIds())
             self.categoryIds = self.coco_obj.getCatIds()
             self.categories = self.coco_obj.loadCats(self.categoryIds)
             self.categoryNames = [cat["name"] for cat in self.categories]
+            random.shuffle(self.imgs)
         else:
             self.filterDataset(filter_categories)
         
-    def filterDataset(self, categories: list):        
-        self.imgs = []
-        self.annotations = []
-        self.categories = []
-        self.categoryNames = []
-    
+
+    def filterDataset(self, categories: list):  
+        """ Filters the loaded dataset by the given list of category names.
+
+        Args:
+            categories (list): List of category names to use.
+        """
         catIds = self.coco_obj.getCatIds(catNms=categories)
         imgIds = self.coco_obj.getImgIds(catIds=catIds)
         self.imgs = self.coco_obj.loadImgs(imgIds)
@@ -75,74 +94,95 @@ class CocoDatasetGenerator:
                 
         random.shuffle(self.imgs)
 
-    def getClassName(self, classId):
+    def getCategoryName(self, category_id):
+        """ Returns the category name for a given id.
+
+        Args:
+            classId (int): Category ID to find the corresponding name for
+
+        Returns:
+            str: Category name or None if not found
+        """
         for cat in self.categories:
-            if cat['id']==classId:
+            if cat['id']==category_id:
                 return cat['name']
         return None
 
-    def generate_mask(self, img, input_size=(224,224)):
+    def generateMask(self, img: dict):
+        """ Generate the segmentation mask for a given coco image object.
+
+        Args:
+            img (dict): Coco image object to generate the segmentation mask for (Mask size: (img["height"], img["width"], 1))
+
+        Returns:
+            nparray: Segementation mask for the given image
+        """
         annIds = self.coco_obj.getAnnIds(img['id'], catIds=self.categoryIds, iscrowd=None)
         anns = self.coco_obj.loadAnns(annIds)
-        mask = np.zeros((input_size))
+        mask = np.zeros((img["height"], img["width"]))
         for a in range(len(anns)):
-            className = self.getClassName(anns[a]['category_id'])
-            pixel_value = self.categories.index(className)+1
+            className = self.getCategoryName(anns[a]['category_id'])
+            pixel_value = self.categoryNames.index(className)+1
             mask = np.maximum(self.coco_obj.annToMask(anns[a])*pixel_value, mask)
+        mask = cv2.resize(mask, (self.data_size[0], self.data_size[1]))
+        mask = mask[..., np.newaxis]
+        return mask
 
-        return mask.reshape(input_size[0], input_size[1], 1)
+    def loadImage(self, image_obj: dict):
+        """ Loads the real image for a given coco image object.
 
-    def create_data_generator(self, categories=None, input_size=(224,224), batch_size=4, augmentation=False, augmentation_args=None):
+        Args:
+            image_obj (dict): Coco image object to load the image for 
+
+        Returns:
+            array: The loaded color image
         """
-        augGeneratorArgs = dict(featurewise_center = False, 
-                        samplewise_center = False,
-                        rotation_range = 5, 
-                        width_shift_range = 0.01, 
-                        height_shift_range = 0.01, 
-                        brightness_range = (0.8,1.2),
-                        shear_range = 0.01,
-                        zoom_range = [1, 1.25],  
-                        horizontal_flip = True, 
-                        vertical_flip = False,
-                        fill_mode = 'reflect',
-                        data_format = 'channels_last')
+        img = cv2.imread(os.path.join(self.img_dir, image_obj['file_name']))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  / 255.0
+        img = cv2.resize(img, self.data_size)
+        if (len(img.shape)==3 and img.shape[2]==3):
+            return img
+        else:
+            stacked_img = np.stack((img,)*3, axis=-1)
+            return stacked_img
+
+    def createDataGenerator(self, categories=None, batch_size=4):
+        """ Creates the dataset generator with given batch size and possible filtering,
+
+        Args:
+            categories (list, optional): List of category names to use. Uses all if None. Defaults to None.
+            batch_size (int, optional): Defines the size of the return batch. Defaults to 4.
+
+        Yields:
+            tuple: Batch of (images, masks) with a first dimension of "batch_size"
         """
         if categories:
             self.filterDataset(categories)
-        imgAugGenerator = None
-        maskAugGenerator = None
-        if augmentation and augmentation_args is not None:
-            imgAugGenerator = ImageDataGenerator(**augmentation_args)
-            maskAugGenerator = ImageDataGenerator(**augmentation_args)
 
         iteration_cnt = 0
         iteration_max = len(self.imgs)
         while True:
-            img_batch = np.zeros((batch_size, input_size[0], input_size[1], 3)).astype(np.float32)
-            mask_batch = np.zeros((batch_size, input_size[0], input_size[1], 1)).astype(np.float32)
+            img_batch = np.zeros((batch_size, self.data_size[0], self.data_size[1], 3)).astype(np.float32)
+            mask_batch = np.zeros((batch_size, self.data_size[0], self.data_size[1], 1)).astype(np.float32)
             for i in range(iteration_cnt, iteration_cnt+batch_size):
                 img = self.imgs[i]
-                img_batch[i-iteration_cnt] = img
-                mask_batch[i-iteration_cnt] = self.generate_mask(img, input_size=input_size)
+                img_batch[i-iteration_cnt] = self.loadImage(img)
+                mask_batch[i-iteration_cnt] = self.generateMask(img)
             
-            cnt += batch_size
-            if cnt + batch_size >= iteration_max:
+            iteration_cnt += batch_size
+            if iteration_cnt + batch_size >= iteration_max:
                 iteration_cnt = 0
                 random.shuffle(self.imgs)
 
-            if imgAugGenerator is not None and maskAugGenerator is not None:
-                seed = random.randint(0,9999)
-                gen_img = imgAugGenerator.flow(img_batch, batch_size=batch_size, seed=seed, shuffle=True)
-                gen_mask = imgAugGenerator.flow(mask_batch, batch_size=batch_size, seed=seed, shuffle=True)
-                img_batch_aug = next(gen_img)
-                mask_batch_aug = next(gen_mask)
-                yield img_batch_aug, mask_batch_aug
-            else:
-                yield img_batch, mask_batch
+            yield img_batch, mask_batch
 
-    def visualize_generator(self, gen, num_examples=3):
+    def visualizeGenerator(self, gen):
+        """ Visualizes 4 examples of a given generator. 
+
+        Args:
+            gen (generator): Generator to call "next()" on to get data
+        """
         img, mask = next(gen)
-        
         fig = plt.figure(figsize=(20, 10))
         outerGrid = gridspec.GridSpec(1, 2, wspace=0.1, hspace=0.1)
         
@@ -160,27 +200,3 @@ class CocoDatasetGenerator:
                 ax.axis('off')
                 fig.add_subplot(ax)        
         plt.show()
-
-
-def visualize_datasplit(img_per_cat):
-    fig = go.Figure([go.Bar(x=list(img_per_cat.keys()), y=list(img_per_cat.values()))])
-    fig.update_layout(
-        title="No of Image per class", )
-    fig.show()
-    fig = go.Figure(data=[go.Pie(labels=list(img_per_cat.keys()), values=list(img_per_cat.values()),
-                                 hole=.3, textposition='inside', )], )
-    fig.update_layout(
-        title="No of Image per class ( In pie )", )
-    fig.show()
-
-
-def show_annotation_examples(train_coco, train_annotations_data, num_images):
-    annIds = train_coco.getAnnIds(imgIds=train_annotations_data['images'][num_images]['id'])
-    annotations = train_coco.loadAnns(annIds)
-    train_coco.showAnns(annotations)
-    plt.show()
-
-
-if __name__ == "__main__":
-   train_gen = CocoDatasetGenerator(TRAIN_ANNOTATIONS_PATH, TRAIN_IMAGE_DIRECTORY)
-   val_gen = CocoDatasetGenerator(VAL_ANNOTATIONS_PATH, VAL_IMAGE_DIRECTORY)
